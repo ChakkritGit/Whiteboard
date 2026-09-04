@@ -40,7 +40,9 @@
   --glass-shadow: 16 24 40;
   --glass-shadow-strength: 0.09;
   /* How thick the pane reads as being: the band the light bends in. */
-  --glass-rim-width: 14px;
+  /* How thick the pane reads as being: the band the light bends in, and
+     the distance over which the bend fades away to nothing. */
+  --glass-rim-width: 22px;
   color-scheme: light;
 }
 
@@ -61,7 +63,7 @@
   --glass-rim-soft: rgb(255 255 255 / 0.06);
   --glass-shadow: 0 0 0;
   --glass-shadow-strength: 0.5;
-  --glass-rim-width: 14px;
+  --glass-rim-width: 22px;
   color-scheme: dark;
 }
 
@@ -180,18 +182,26 @@ textarea,
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    padding: var(--glass-rim-width);
     pointer-events: none;
-    -webkit-backdrop-filter: url('#glass-warp') brightness(1.05);
-    backdrop-filter: url('#glass-warp') brightness(1.05);
+    -webkit-backdrop-filter: url('#glass-warp');
+    backdrop-filter: url('#glass-warp');
+    /* Four soft bands, one per side, unioned. Each is opaque against its own
+       edge and fades to nothing `--glass-rim-width` in, so the ring has no inner
+       boundary to see — which a `content-box` cut-out does have, and it showed:
+       displaced inside, undisplaced outside, and a seam between them that read
+       as a drawn line rather than as an edge of glass. */
     -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
+      linear-gradient(to right, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to left, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to bottom, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to top, #000, transparent var(--glass-rim-width));
     mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+      linear-gradient(to right, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to left, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to bottom, #000, transparent var(--glass-rim-width)),
+      linear-gradient(to top, #000, transparent var(--glass-rim-width));
+    -webkit-mask-composite: source-over;
+    mask-composite: add;
   }
 
   .glass::after {
