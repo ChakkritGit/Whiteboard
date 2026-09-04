@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Whiteboard
 
-## Getting Started
+A shared board with nothing to sign in to. Open it, send the link, and whoever
+follows it is already in the room with you.
 
-First, run the development server:
+## Running it
+
+Two processes: the site, and the server that relays a room between the people in
+it.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev:all          # the board on :3000, rooms on :1234
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Or separately, which is easier to read the logs of:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run server           # ws://localhost:1234
+npm run dev              # http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Point the browser at `/` and it sends you to a fresh board. `NEXT_PUBLIC_WS_URL`
+moves the room server somewhere else.
 
-## Learn More
+## How it holds together
 
-To learn more about Next.js, take a look at the following resources:
+- **The room is the URL.** There is no account, no session and no database of
+  boards. A room id in the path is the whole of the access control, which is what
+  makes "just share the link" true rather than a feature on top of a login.
+- **The board is a CRDT** (Yjs). Items live in a map of maps rather than an array
+  of objects, so two people dragging the same note write to different keys and
+  both edits survive — an array of whole objects would have one overwrite the
+  other.
+- **Two providers, two jobs.** IndexedDB keeps the board on your machine, so it
+  opens instantly and survives going offline. The websocket carries it to
+  everyone else. The server holds a room in memory only while somebody is in it;
+  what outlives everyone leaving is the copy in each browser and any file you
+  exported.
+- **Text is text.** Notes are positioned DOM elements rather than shapes painted
+  into a canvas, so what is written on them is selectable, editable in place, and
+  readable by a screen reader without a parallel accessibility tree.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Files
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Export writes plain JSON — readable and diffable, at the cost of carrying the
+board's contents but not its history. Import validates every field before
+accepting it, since it is the one place the board takes in something it did not
+write: a missing `x` would put a note at `NaN`, where nobody could ever find or
+select it again.
 
-## Deploy on Vercel
+## Keys
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| | |
+|---|---|
+| `V` `P` `H` `E` `R` `N` `T` `F` | select, pen, highlighter, eraser, rectangle, note, text, frame |
+| Drag on empty board | pan · `⌘`/`Ctrl` + wheel zooms |
+| Double-click a note | edit it |
+| `Delete` | remove what is selected |
+| `⌘`/`Ctrl` + `A` | select everything |
