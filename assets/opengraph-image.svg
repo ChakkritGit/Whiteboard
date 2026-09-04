@@ -1,0 +1,69 @@
+<!-- Source for src/app/opengraph-image.png. Re-render it at 1200x630 with any
+     SVG rasteriser; sharp does it in one line. Kept in the repo so the card can
+     be edited rather than redrawn. (No double hyphens in here: XML forbids them
+     inside a comment, and the file stops being an SVG.) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#1f2430" fill-opacity="0.09"/>
+    </pattern>
+    <filter id="lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#1f2430" flood-opacity="0.13"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#1f2430" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#f4f2ee"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+
+  <rect x="612" y="96" width="470" height="330" rx="18" fill="#ffffff" fill-opacity="0.5"
+        stroke="#c9c6c0" stroke-width="3" stroke-dasharray="10 9"/>
+
+  <g filter="url(#lift)" transform="rotate(-4 700 200)">
+    <rect x="648" y="132" width="196" height="152" rx="12" fill="#A7F3D0"/>
+    <text x="672" y="176" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#065F46">No sign-in</text>
+    <text x="672" y="210" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#065F46">at all</text>
+  </g>
+  <g filter="url(#lift)" transform="rotate(3 900 220)">
+    <rect x="866" y="150" width="196" height="152" rx="12" fill="#BAE0FD"/>
+    <text x="890" y="194" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#0C4A6E">Share the</text>
+    <text x="890" y="228" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#0C4A6E">link</text>
+  </g>
+  <g filter="url(#lift)" transform="rotate(-2 760 380)">
+    <rect x="724" y="318" width="196" height="152" rx="12" fill="#FBCFE8"/>
+    <text x="748" y="362" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#831843">Everyone</text>
+    <text x="748" y="396" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#831843">at once</text>
+  </g>
+
+  <path d="M636 512c46-58 84-58 108-6 22 48 54 52 92 6 40-48 84-44 122 10 26 38 60 42 100 10"
+        fill="none" stroke="#1f2430" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g transform="translate(958 386)">
+    <path d="M0 0l26 15.5-11.5 2.6L9 34 0 0Z" fill="#EC4899"/>
+    <rect x="18" y="24" width="126" height="36" rx="10" fill="#EC4899"/>
+    <text x="33" y="48" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#ffffff">Bold Otter</text>
+  </g>
+
+  <g transform="translate(96 176) scale(2.6)" filter="url(#soft)">
+    <rect x="1.5" y="1.5" width="29" height="29" rx="8.5" fill="#6366F1"/>
+    <path d="M7.5 21.5c2.6-7.4 5.2-11.1 7.8-11.1 2 0 2.4 2 1.2 4.3-1.1 2.2-2.6 3.2-3.4 2.6-1-.8.3-2.6 3-3.4 2.3-.7 4.6-.5 7 .6"
+          fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M19.5 20.5h6v4.2l-2.6 2.3h-3.4v-6.5Z" fill="#FDE68A"/>
+    <path d="M25.5 24.7h-2.6v2.3" fill="none" stroke="#B98A2E" stroke-width="1.3" stroke-linejoin="round"/>
+  </g>
+
+  <text x="96" y="336" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="76" font-weight="800" fill="#1f2430" letter-spacing="-2">Whiteboard</text>
+  <text x="96" y="392" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="29" font-weight="500" fill="#6b7280">A shared board. Send the link,</text>
+  <text x="96" y="432" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="29" font-weight="500" fill="#6b7280">start moving things around.</text>
+
+  <!-- The pill is sized to its contents rather than guessed at: 24px of padding
+       either side of a 12px dot, a 10px gap, and the measured width of the
+       label. Guessing put the last word outside the rounded rectangle. -->
+  <g transform="translate(96 480)">
+    <rect width="278" height="48" rx="24" fill="#ffffff" fill-opacity="0.75" stroke="#e5e3df" stroke-width="2"/>
+    <circle cx="36" cy="24" r="6" fill="#10b981"/>
+    <text x="52" y="31" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="19" font-weight="600" fill="#047857">Live, with no account</text>
+  </g>
+</svg>

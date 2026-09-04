@@ -80,15 +80,34 @@ body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'Noto Sans Thai', sans-serif;
-  /* The canvas pans; the page itself never scrolls. */
-  overflow: hidden;
-  overscroll-behavior: none;
   /* Dragging a note across the board would otherwise sweep a blue text
      selection across every label it passed over. Nothing on a canvas is meant
      to be selected as text except the thing you are actually typing into, and
      that is put back below. */
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* The canvas pans, so the page behind it must not scroll or rubber-band. Scoped
+   to the board rather than set on `body`, because the front page is an ordinary
+   page and was unscrollable — the whole of it below the fold unreachable. */
+body:has(.board-shell) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Tailwind v4's Preflight no longer gives buttons a pointer cursor, and a button
+   that does not look pressable does not get pressed. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+summary,
+label[for],
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 input,

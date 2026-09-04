@@ -1033,7 +1033,7 @@ export function BoardApp({ room }: { room: string }) {
     })
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden">
+    <main className="board-shell relative h-screen w-screen overflow-hidden">
       <TopBar
         title={title}
         onTitle={setTitle}

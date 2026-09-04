@@ -28,7 +28,13 @@ const FEATURES = [
   {
     title: 'Works offline',
     body: 'The board is kept in your browser as well as in the room, so it opens instantly, survives a dropped connection, and catches up when you come back.',
-    icon: <path d="M5 18h9a4 4 0 0 0 .6-8A6 6 0 0 0 3.5 12M17 14l3 3m0-3-3 3" />,
+    icon: (
+      <>
+        <path d="m2 2 20 20" />
+        <path d="M5.8 5.8A7 7 0 0 0 9 19h8.5c.5 0 .9-.07 1.3-.2" />
+        <path d="M21.5 16.5A4.5 4.5 0 0 0 17.5 10h-1.8A7 7 0 0 0 10 5.07" />
+      </>
+    ),
   },
   {
     title: 'The tools you reach for',
@@ -115,7 +121,7 @@ export default function Home() {
           </span>
           <a
             href={SITE.repo}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-muted hover:bg-panel/70 hover:text-ink"
+            className="inline-flex items-center rounded-lg border border-line px-3 py-1.5 text-sm/6 font-semibold text-muted hover:bg-panel/70 hover:text-ink"
           >
             Source
           </a>
