@@ -26,12 +26,19 @@
 :root {
   --paper-dot: rgb(31 36 48 / 0.07);
   --paper-dot-soft: rgb(31 36 48 / 0.05);
-  /* Thin fill, heavy blur. With the fill this low the board reads clearly
-     through every panel; the blur is what stops what shows through competing
-     with the panel's own text, and the saturation puts back the colour the blur
-     takes out. The rim carries the edge now that nothing bends there. */
+  /**
+   * Thin fill, moderate blur.
+   *
+   * The fill is as low as it goes while the panel's own text still reads. The
+   * blur is *not* pushed to match, and that is deliberate: past roughly twenty
+   * pixels on a panel this size Chrome stops filtering the backdrop at all —
+   * not a smaller blur, none — and every panel goes from glass to flat tinted
+   * plastic with a hard edge. Raising this number is the one change here that
+   * can silently remove the effect it is meant to strengthen, so if the glass
+   * ever looks like plastic again, look here first.
+   */
   --glass-fill: rgb(255 255 255 / 0.26);
-  --glass-filter: blur(30px) saturate(220%) brightness(1.08);
+  --glass-filter: blur(16px) saturate(220%) brightness(1.08);
   --glass-edge: rgb(255 255 255 / 0.5);
   --glass-sheen: rgb(255 255 255 / 0.5);
   --glass-rim: rgb(255 255 255 / 1);
@@ -52,7 +59,7 @@
   --paper-dot: rgb(255 255 255 / 0.09);
   --paper-dot-soft: rgb(255 255 255 / 0.06);
   --glass-fill: rgb(28 31 40 / 0.32);
-  --glass-filter: blur(32px) saturate(190%) brightness(1.16);
+  --glass-filter: blur(18px) saturate(190%) brightness(1.16);
   --glass-edge: rgb(255 255 255 / 0.1);
   --glass-sheen: rgb(255 255 255 / 0.14);
   --glass-rim: rgb(255 255 255 / 0.5);
@@ -139,10 +146,11 @@ textarea,
   .glass {
     position: relative;
     isolation: isolate;
-    background:
-      radial-gradient(120% 90% at 18% -20%, var(--glass-sheen), transparent 62%),
-      linear-gradient(180deg, var(--glass-sheen), transparent 45%),
-      var(--glass-fill);
+    /* A flat colour, with the sheen back on its own layer below the content.
+       Painting the sheen into this shorthand as two gradients cost the blur:
+       Chromium stopped filtering the backdrop of these panels entirely, and
+       every one of them went from glass to tinted plastic. */
+    background: var(--glass-fill);
     -webkit-backdrop-filter: var(--glass-filter);
     backdrop-filter: var(--glass-filter);
     border: 1px solid var(--glass-edge);
@@ -150,6 +158,22 @@ textarea,
       0 1px 2px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.55)),
       0 8px 20px rgb(var(--glass-shadow) / var(--glass-shadow-strength)),
       0 24px 48px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.8));
+  }
+
+  /* The sheen: a soft highlight across the top, under the content. `z-index:-1`
+     puts it above the panel's own background and below everything in it, which
+     is exactly where a reflection sits. */
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 18% -20%, var(--glass-sheen), transparent 62%),
+      linear-gradient(180deg, var(--glass-sheen), transparent 45%);
+    opacity: 0.85;
   }
 
   .glass::after {
