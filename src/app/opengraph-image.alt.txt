@@ -1,0 +1,1 @@
+The Whiteboard app: sticky notes, a pen stroke and another person's cursor on a shared board.
