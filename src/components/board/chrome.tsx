@@ -7,53 +7,6 @@ import type { Me } from '@/lib/identity'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { Logo } from './logo'
 
-/* -------------------------------- glass -------------------------------- */
-
-/**
- * The displacement map every glass panel refracts through.
- *
- * Two passes, one per axis, because a displacement map reads the horizontal
- * shift from one channel and the vertical from another, and a gradient that
- * ramps one while holding the other exactly at the neutral 128 is far easier to
- * be sure of than one image trying to carry both.
- *
- * A plain ramp, corner to corner, because the only thing it is ever applied to
- * is the rim ring in `.glass::before` — every pixel it touches is already at an
- * edge, so it wants an even push outward rather than a curve that goes flat in
- * a middle that is masked away regardless.
- *
- * Rendered once, at the root of the board — a filter is referenced by id, so one
- * copy serves every panel on the page.
- */
-const RAMP = (vertical: boolean) => {
-  const dir = vertical ? "x1='0' y1='0' x2='0' y2='1'" : "x1='0' y1='0' x2='1' y2='0'"
-  const from = vertical ? 'rgb(128,0,0)' : 'rgb(0,128,0)'
-  const to = vertical ? 'rgb(128,255,0)' : 'rgb(255,128,0)'
-  const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'>` +
-    `<linearGradient id='g' ${dir}>` +
-    `<stop offset='0' stop-color='${from}'/>` +
-    `<stop offset='0.5' stop-color='rgb(128,128,0)'/>` +
-    `<stop offset='1' stop-color='${to}'/>` +
-    `</linearGradient><rect width='100' height='100' fill='url(#g)'/></svg>`
-  // `encodeURIComponent` is what turns the `#` of the gradient reference into
-  // `%23`; left raw, a data URI ends at the first hash.
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
-}
-
-export function GlassFilter() {
-  return (
-    <svg aria-hidden className="pointer-events-none absolute size-0" focusable="false">
-      <filter id="glass-warp" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
-        <feImage preserveAspectRatio="none" result="mx" href={RAMP(false)} />
-        <feDisplacementMap in="SourceGraphic" in2="mx" scale="18" xChannelSelector="R" yChannelSelector="G" result="bent" />
-        <feImage preserveAspectRatio="none" result="my" href={RAMP(true)} />
-        <feDisplacementMap in="bent" in2="my" scale="18" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
-  )
-}
-
 /* --------------------------------- top --------------------------------- */
 
 export function TopBar({

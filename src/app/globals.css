@@ -26,23 +26,19 @@
 :root {
   --paper-dot: rgb(31 36 48 / 0.07);
   --paper-dot-soft: rgb(31 36 48 / 0.05);
-  /* Thin fill, light blur: enough to soften what is behind a panel without
-     dissolving it, so a note under the top bar still reads as that note rather
-     than as a coloured smear. The cost of dialling both down together is that
-     the panel's own text has less to sit against — the rim and the sheen are
-     doing more of the work of separating them than they were. */
-  --glass-fill: rgb(255 255 255 / 0.34);
-  --glass-filter: blur(14px) saturate(210%) brightness(1.07);
+  /* Thin fill, heavy blur. With the fill this low the board reads clearly
+     through every panel; the blur is what stops what shows through competing
+     with the panel's own text, and the saturation puts back the colour the blur
+     takes out. The rim carries the edge now that nothing bends there. */
+  --glass-fill: rgb(255 255 255 / 0.26);
+  --glass-filter: blur(30px) saturate(220%) brightness(1.08);
   --glass-edge: rgb(255 255 255 / 0.5);
   --glass-sheen: rgb(255 255 255 / 0.5);
-  --glass-rim: rgb(255 255 255 / 0.95);
-  --glass-rim-soft: rgb(255 255 255 / 0.25);
+  --glass-rim: rgb(255 255 255 / 1);
+  --glass-rim-soft: rgb(255 255 255 / 0.32);
   --glass-shadow: 16 24 40;
   --glass-shadow-strength: 0.09;
   /* How thick the pane reads as being: the band the light bends in. */
-  /* How thick the pane reads as being: the band the light bends in, and
-     the distance over which the bend fades away to nothing. */
-  --glass-rim-width: 22px;
   color-scheme: light;
 }
 
@@ -55,15 +51,14 @@
   --color-accent: #818cf8;
   --paper-dot: rgb(255 255 255 / 0.09);
   --paper-dot-soft: rgb(255 255 255 / 0.06);
-  --glass-fill: rgb(28 31 40 / 0.4);
-  --glass-filter: blur(16px) saturate(180%) brightness(1.15);
+  --glass-fill: rgb(28 31 40 / 0.32);
+  --glass-filter: blur(32px) saturate(190%) brightness(1.16);
   --glass-edge: rgb(255 255 255 / 0.1);
   --glass-sheen: rgb(255 255 255 / 0.14);
-  --glass-rim: rgb(255 255 255 / 0.4);
-  --glass-rim-soft: rgb(255 255 255 / 0.06);
+  --glass-rim: rgb(255 255 255 / 0.5);
+  --glass-rim-soft: rgb(255 255 255 / 0.08);
   --glass-shadow: 0 0 0;
   --glass-shadow-strength: 0.5;
-  --glass-rim-width: 22px;
   color-scheme: dark;
 }
 
@@ -155,53 +150,6 @@ textarea,
       0 1px 2px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.55)),
       0 8px 20px rgb(var(--glass-shadow) / var(--glass-shadow-strength)),
       0 24px 48px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.8));
-  }
-
-  /**
-   * The bend, confined to the rim.
-   *
-   * Real glass does not only dim what is behind it, it *moves* it — and it does
-   * so where the pane is thickest, at the edge. That is geometry, and no amount
-   * of blur imitates it, so what is behind this ring is run through an SVG
-   * displacement map (`#glass-warp`, rendered once by the board).
-   *
-   * A ring rather than the whole panel, and a ring of fixed width. Displacing
-   * the whole panel spread the distortion across its entire area — on a tall
-   * layer list that is two hundred pixels of smeared colour, which reads as a
-   * dirty lens rather than a thick edge. Masked to `--glass-rim-width` the
-   * distortion has nowhere to go but the edge, whatever size the panel is.
-   *
-   * Deliberately on this layer and not on `.glass` itself: a browser that will
-   * not resolve a filter reference inside `backdrop-filter` drops the whole
-   * chain it appears in, so putting it here means such a browser loses the bend
-   * and keeps the blur, rather than ending up with a flat pane of tinted
-   * plastic.
-   */
-  .glass::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    -webkit-backdrop-filter: url('#glass-warp');
-    backdrop-filter: url('#glass-warp');
-    /* Four soft bands, one per side, unioned. Each is opaque against its own
-       edge and fades to nothing `--glass-rim-width` in, so the ring has no inner
-       boundary to see — which a `content-box` cut-out does have, and it showed:
-       displaced inside, undisplaced outside, and a seam between them that read
-       as a drawn line rather than as an edge of glass. */
-    -webkit-mask:
-      linear-gradient(to right, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to left, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to bottom, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to top, #000, transparent var(--glass-rim-width));
-    mask:
-      linear-gradient(to right, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to left, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to bottom, #000, transparent var(--glass-rim-width)),
-      linear-gradient(to top, #000, transparent var(--glass-rim-width));
-    -webkit-mask-composite: source-over;
-    mask-composite: add;
   }
 
   .glass::after {

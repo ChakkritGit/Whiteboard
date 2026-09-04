@@ -28,7 +28,7 @@ import { saveMe, type Me } from '@/lib/identity'
 import { download, readFile } from '@/lib/io'
 import { BoardItem, type Corner } from './board-item'
 import { ContextMenu, type MenuEntry } from './menu'
-import { Cursors, GlassFilter, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
+import { Cursors, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
@@ -1034,8 +1034,6 @@ export function BoardApp({ room }: { room: string }) {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden">
-      <GlassFilter />
-
       <TopBar
         title={title}
         onTitle={setTitle}
