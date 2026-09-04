@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // A separate build for a separate runtime, with its own tsconfig.
+    "worker/**",
   ]),
 ]);
 

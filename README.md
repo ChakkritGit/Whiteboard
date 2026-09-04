@@ -28,9 +28,41 @@ moves the room server somewhere else.
 Two things ship, and they cannot both go to the same place.
 
 The site is an ordinary Next.js app — Vercel, Netlify, anywhere. The room server
-is a process that has to stay alive holding open websockets, which serverless
-functions cannot do. Put it somewhere that runs a container or a long-lived
-process (Railway, Render, Fly, a VPS), then point the site at it:
+is different: it has to stay alive holding websockets open, which an ordinary
+serverless function cannot do.
+
+### On Cloudflare, with no server of your own
+
+A Worker on its own cannot hold a socket open either — but a **Durable Object**
+can, and one object per room is the shape this problem already has. Cloudflare
+routes every connection for a given room name to the same object wherever in the
+world it is, so the object *is* the room and there is nothing to coordinate
+between instances.
+
+```bash
+cd worker
+npm install
+npx wrangler login
+npx wrangler deploy      # prints https://whiteboard-rooms.<subdomain>.workers.dev
+```
+
+Then point the site at it and rebuild:
+
+```
+NEXT_PUBLIC_WS_URL=wss://whiteboard-rooms.<subdomain>.workers.dev
+```
+
+Durable Objects need to be enabled on the account. The class is declared as
+`new_sqlite_classes` in `worker/wrangler.toml`, which is the flavour the free
+plan allows; `new_classes` is the paid one.
+
+`npx wrangler dev` runs the whole thing locally, Durable Object and all, if you
+would rather see it work before deploying.
+
+### Or anywhere that runs a process
+
+`scripts/server.mjs` is the same relay as a plain Node process — Railway, Render,
+Fly, a VPS:
 
 ```
 NEXT_PUBLIC_WS_URL=wss://rooms.example.com
@@ -39,9 +71,9 @@ NEXT_PUBLIC_WS_URL=wss://rooms.example.com
 `wss://`, not `ws://`: a page served over HTTPS is not allowed to open an
 unencrypted socket, so the board will simply never connect if this is wrong.
 
-Until that is set the site still works — the board is kept in IndexedDB and
-everything but other people is there — but a shared link opens an empty board,
-because nothing is relaying between browsers.
+Until one of these is set the site still works — the board is kept in IndexedDB
+and everything but other people is there — but a shared link opens an empty
+board, because nothing is relaying between browsers.
 
 ## How it holds together
 
@@ -74,7 +106,14 @@ select it again.
 | | |
 |---|---|
 | `V` `P` `H` `E` `R` `N` `T` `F` | select, pen, highlighter, eraser, rectangle, note, text, frame |
-| Drag on empty board | pan · `⌘`/`Ctrl` + wheel zooms |
-| Double-click a note | edit it |
+| Drag on empty board | sweep a selection round things |
+| Hold `Space` and drag | move the view · `⌘`/`Ctrl` + wheel zooms |
+| `Alt` + drag a note | pull a copy out of it |
+| Right-click | cut, copy, order, lock, group |
+| Double-click a note | edit it · `Return` starts a new line |
+| `⌘`/`Ctrl` + `C` `X` `V` `D` | copy, cut, paste, duplicate |
+| `⌘`/`Ctrl` + `G` | group · add `⇧` to ungroup |
+| `]` and `[` | bring to front, send to back |
 | `Delete` | remove what is selected |
 | `⌘`/`Ctrl` + `A` | select everything |
+| `⌘`/`Ctrl` + `Z` | undo · add `⇧` to redo |

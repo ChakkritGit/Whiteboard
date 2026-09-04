@@ -1,0 +1,15 @@
+name = "whiteboard-rooms"
+main = "src/index.ts"
+# A date the runtime actually knows about. A date in the future is not a
+# newer Worker, it is one Cloudflare will refuse.
+compatibility_date = "2025-07-18"
+
+# One object per room. `new_sqlite_classes` rather than `new_classes`: the
+# SQLite-backed flavour is the one the free plan allows.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
