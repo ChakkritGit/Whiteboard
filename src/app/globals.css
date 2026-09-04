@@ -86,6 +86,14 @@ textarea,
   -webkit-user-select: text;
 }
 
+/* Said explicitly rather than left to inherit: the browser's own sheet has
+   opinions about anything carrying a `contenteditable` attribute at all, and a
+   note that is not being edited is not a place text should be selectable. */
+[contenteditable='false'] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /**
  * In `components`, not loose at the end of the file.
  *

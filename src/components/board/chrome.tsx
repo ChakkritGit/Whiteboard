@@ -185,16 +185,19 @@ export function TopBar({
  * blank until mounted: the current mode comes from local storage, so drawing
  * which one is pressed during the server render is a mismatch by construction.
  */
+// Named "Light theme" rather than "Light": the type controls in the dock have a
+// weight by that name, and two buttons on one screen answering to the same name
+// is ambiguous to anyone driving this by voice or by screen reader.
 const MODES: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
   {
     id: 'light',
-    label: 'Light',
+    label: 'Light theme',
     icon: <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7 1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2-1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />,
   },
-  { id: 'dark', label: 'Dark', icon: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" /> },
+  { id: 'dark', label: 'Dark theme', icon: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" /> },
   {
     id: 'system',
-    label: 'System',
+    label: 'Match the system',
     icon: <path d="M4 5h16v10H4zM9 19h6M12 15v4" />,
   },
 ]

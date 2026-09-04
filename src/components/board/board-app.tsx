@@ -817,7 +817,13 @@ export function BoardApp({ room }: { room: string }) {
         event.target instanceof HTMLElement &&
         (event.target.isContentEditable || event.target.tagName === 'INPUT')
       if (typing) {
-        if (event.key === 'Escape') (event.target as HTMLElement).blur()
+        // Blurring alone left the note in edit mode as far as React was
+        // concerned: still `contenteditable`, still ignoring anything the room
+        // typed into it, until some later click happened to clear it.
+        if (event.key === 'Escape') {
+          ;(event.target as HTMLElement).blur()
+          setEditing(null)
+        }
         return
       }
       const mod = event.metaKey || event.ctrlKey
