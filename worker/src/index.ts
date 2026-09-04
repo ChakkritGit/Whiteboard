@@ -44,7 +44,16 @@ export default {
 export class Room implements DurableObject {
   private doc = new Y.Doc()
   private awareness = new awarenessProtocol.Awareness(this.doc)
-  private conns = new Set<WebSocket>()
+  /**
+   * Socket to the awareness clients it speaks for.
+   *
+   * A set of sockets is not enough: on disconnect the room has to know *whose*
+   * presence to withdraw, and awareness does not record that — its `meta` holds
+   * a clock and a timestamp and nothing about where the state came from. So the
+   * pairing is noted down at the one moment both are in hand, in the awareness
+   * handler below.
+   */
+  private conns = new Map<WebSocket, Set<number>>()
 
   constructor() {
     this.awareness.setLocalState(null)
@@ -59,6 +68,12 @@ export class Room implements DurableObject {
     this.awareness.on(
       'update',
       ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
+        const owned = this.conns.get(origin as WebSocket)
+        if (owned) {
+          added.forEach((client) => owned.add(client))
+          removed.forEach((client) => owned.delete(client))
+        }
+
         const message = encoding.createEncoder()
         encoding.writeVarUint(message, MESSAGE_AWARENESS)
         encoding.writeVarUint8Array(
@@ -71,7 +86,7 @@ export class Room implements DurableObject {
   }
 
   private broadcast(payload: Uint8Array, except: unknown) {
-    for (const conn of this.conns) {
+    for (const conn of this.conns.keys()) {
       // Not back to whoever sent it: they already have it, and echoing costs a
       // round trip on every keystroke.
       if (conn === except) continue
@@ -88,7 +103,7 @@ export class Room implements DurableObject {
     const client = pair[0]
     const server = pair[1]
     server.accept()
-    this.conns.add(server)
+    this.conns.set(server, new Set())
 
     // Our half of the handshake: here is what I have, send me what I am missing.
     const hello = encoding.createEncoder()
@@ -133,14 +148,15 @@ export class Room implements DurableObject {
     })
 
     const leave = () => {
+      // Withdraw this socket's presence at once, and tell the room. Without it
+      // the person who just refreshed haunts the board as a second cursor until
+      // y-protocols times the stale state out thirty seconds later — which is
+      // exactly what a refresh looked like: two of you, then one.
+      const owned = this.conns.get(server)
       this.conns.delete(server)
-      awarenessProtocol.removeAwarenessStates(
-        this.awareness,
-        Array.from(this.awareness.getStates().keys()).filter(
-          (client) => (this.awareness.meta.get(client) as { conn?: unknown } | undefined)?.conn === server,
-        ),
-        null,
-      )
+      if (owned && owned.size > 0) {
+        awarenessProtocol.removeAwarenessStates(this.awareness, Array.from(owned), null)
+      }
     }
     server.addEventListener('close', leave)
     server.addEventListener('error', leave)

@@ -38,14 +38,18 @@ function room(name) {
   const doc = new Y.Doc()
   const awareness = new awarenessProtocol.Awareness(doc)
   awareness.setLocalState(null)
-  entry = { doc, awareness, conns: new Set() }
+  // Socket to the awareness clients it speaks for. A set of sockets is not
+  // enough: on disconnect the room has to know *whose* presence to withdraw, and
+  // awareness itself does not record that — its `meta` holds a clock and a
+  // timestamp and nothing about where the state came from.
+  entry = { doc, awareness, conns: new Map() }
 
   doc.on('update', (update, origin) => {
     const message = encoding.createEncoder()
     encoding.writeVarUint(message, MESSAGE_SYNC)
     sync.writeUpdate(message, update)
     const payload = encoding.toUint8Array(message)
-    entry.conns.forEach((conn) => {
+    entry.conns.forEach((_owned, conn) => {
       // Not back to whoever sent it: they already have it, and echoing costs a
       // round trip on every keystroke.
       if (conn !== origin) send(conn, payload)
@@ -53,12 +57,21 @@ function room(name) {
   })
 
   awareness.on('update', ({ added, updated, removed }, origin) => {
+    // Note down which client arrived on which socket, while the origin is still
+    // in hand. This is the only moment the connection and the client id are
+    // known together.
+    const owned = entry.conns.get(origin)
+    if (owned) {
+      added.forEach((client) => owned.add(client))
+      removed.forEach((client) => owned.delete(client))
+    }
+
     const changed = added.concat(updated, removed)
     const message = encoding.createEncoder()
     encoding.writeVarUint(message, MESSAGE_AWARENESS)
     encoding.writeVarUint8Array(message, awarenessProtocol.encodeAwarenessUpdate(awareness, changed))
     const payload = encoding.toUint8Array(message)
-    entry.conns.forEach((conn) => {
+    entry.conns.forEach((_owned, conn) => {
       if (conn !== origin) send(conn, payload)
     })
   })
@@ -87,7 +100,7 @@ wss.on('connection', (conn, request) => {
   conn.binaryType = 'arraybuffer'
   const name = decodeURIComponent((request.url ?? '/').slice(1).split('?')[0]) || 'default'
   const here = room(name)
-  here.conns.add(conn)
+  here.conns.set(conn, new Set())
 
   // Step one of the handshake, from our side: here is what I have, tell me what
   // you have that I do not.
@@ -132,14 +145,15 @@ wss.on('connection', (conn, request) => {
   })
 
   conn.on('close', () => {
+    // Withdraw this socket's presence at once, and tell the room. Without it the
+    // person who just refreshed haunts the board as a second cursor until
+    // y-protocols times the stale state out thirty seconds later — which is
+    // exactly what a refresh looked like: two of you, then one.
+    const owned = here.conns.get(conn)
     here.conns.delete(conn)
-    awarenessProtocol.removeAwarenessStates(
-      here.awareness,
-      Array.from(here.awareness.getStates().keys()).filter(
-        (client) => here.awareness.meta.get(client)?.conn === conn,
-      ),
-      null,
-    )
+    if (owned && owned.size > 0) {
+      awarenessProtocol.removeAwarenessStates(here.awareness, Array.from(owned), null)
+    }
     // An empty room is thrown away: the browsers that were in it still hold the
     // board, so there is nothing here worth keeping warm.
     if (here.conns.size === 0) {
