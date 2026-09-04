@@ -26,10 +26,13 @@
 :root {
   --paper-dot: rgb(31 36 48 / 0.07);
   --paper-dot-soft: rgb(31 36 48 / 0.05);
-  --glass-fill: rgb(255 255 255 / 0.55);
-  --glass-filter: blur(24px) saturate(190%) brightness(1.04);
-  --glass-edge: rgb(255 255 255 / 0.45);
-  --glass-sheen: rgb(255 255 255 / 0.6);
+  /* Thin enough to read the board through, with the blur pushed up to pay for
+     it: past a point, less fill is only legible if what shows through is more
+     smeared, or the text on the panel starts competing with a note behind it. */
+  --glass-fill: rgb(255 255 255 / 0.34);
+  --glass-filter: blur(32px) saturate(210%) brightness(1.07);
+  --glass-edge: rgb(255 255 255 / 0.5);
+  --glass-sheen: rgb(255 255 255 / 0.5);
   --glass-rim: rgb(255 255 255 / 0.95);
   --glass-rim-soft: rgb(255 255 255 / 0.25);
   --glass-shadow: 16 24 40;
@@ -46,8 +49,8 @@
   --color-accent: #818cf8;
   --paper-dot: rgb(255 255 255 / 0.09);
   --paper-dot-soft: rgb(255 255 255 / 0.06);
-  --glass-fill: rgb(30 33 42 / 0.6);
-  --glass-filter: blur(26px) saturate(160%) brightness(1.1);
+  --glass-fill: rgb(28 31 40 / 0.4);
+  --glass-filter: blur(34px) saturate(180%) brightness(1.15);
   --glass-edge: rgb(255 255 255 / 0.1);
   --glass-sheen: rgb(255 255 255 / 0.14);
   --glass-rim: rgb(255 255 255 / 0.4);
