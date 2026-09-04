@@ -4,16 +4,18 @@ export type ItemKind = 'sticky' | 'frame' | 'text' | 'shape' | 'comment' | 'stro
 
 /** The one colour name a sticky, shape or frame carries; see `PALETTE`. */
 export type Swatch =
-  | 'yellow'
+  | 'red'
+  | 'peach'
   | 'amber'
-  | 'mint'
+  | 'yellow'
   | 'green'
-  | 'pink'
-  | 'magenta'
+  | 'mint'
   | 'sky'
   | 'indigo'
   | 'lavender'
-  | 'peach'
+  | 'magenta'
+  | 'pink'
+  | 'slate'
 
 export type Item = {
   id: string
@@ -36,6 +38,16 @@ export type Item = {
   /** How wide the pen was, and whether it was the translucent one. */
   stroke?: number
   highlight?: boolean
+  /** Turned about its own centre, in degrees. */
+  angle?: number
+  /** How heavy the type is: 300 thin, 400 regular, 600 semi, 800 heavy. */
+  weight?: number
+  /** What the layer list calls it, when that should not be the text. */
+  name?: string
+  /** Which group it belongs to, if any; see the `groups` map. */
+  group?: string
+  /** Pinned down: still selectable, but not draggable or resizable. */
+  locked?: boolean
   /** Painting order. Higher is nearer the viewer. */
   z: number
 }
@@ -58,4 +70,6 @@ export type BoardFile = {
   title: string
   savedAt: string
   items: Item[]
+  /** Group id to name. Absent in files written before groups existed. */
+  groups?: Record<string, string>
 }

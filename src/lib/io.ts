@@ -11,18 +11,19 @@ import type { BoardFile, Item } from './types'
  * exported file carries the board's contents but not its history.
  */
 
-export function toFile(items: Item[], title: string): BoardFile {
+export function toFile(items: Item[], title: string, groups?: Record<string, string>): BoardFile {
   return {
     format: 'whiteboard',
     version: 1,
     title,
     savedAt: new Date().toISOString(),
     items,
+    groups,
   }
 }
 
-export function download(items: Item[], title: string) {
-  const blob = new Blob([JSON.stringify(toFile(items, title), null, 2)], {
+export function download(items: Item[], title: string, groups?: Record<string, string>) {
+  const blob = new Blob([JSON.stringify(toFile(items, title, groups), null, 2)], {
     type: 'application/json',
   })
   const url = URL.createObjectURL(blob)
@@ -42,7 +43,9 @@ export function download(items: Item[], title: string) {
  * takes in something it did not write, and a missing `x` would put a note at
  * `NaN` where nobody could ever find or select it again.
  */
-export async function readFile(file: File): Promise<{ items: Item[]; title: string }> {
+export async function readFile(
+  file: File,
+): Promise<{ items: Item[]; title: string; groups: Record<string, string> }> {
   const text = await file.text()
 
   let data: unknown
@@ -65,7 +68,20 @@ export async function readFile(file: File): Promise<{ items: Item[]; title: stri
     throw new Error('Some items in that file are damaged.')
   }
 
-  return { items, title: typeof data.title === 'string' ? data.title : 'Imported board' }
+  // Groups arrived after version 1 shipped, so a file without them is a valid
+  // file, not a damaged one.
+  const groups: Record<string, string> = {}
+  if (isRecord(data.groups)) {
+    Object.entries(data.groups).forEach(([id, name]) => {
+      if (typeof name === 'string') groups[id] = name
+    })
+  }
+
+  return {
+    items,
+    title: typeof data.title === 'string' ? data.title : 'Imported board',
+    groups,
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

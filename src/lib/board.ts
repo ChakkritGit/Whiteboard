@@ -25,6 +25,8 @@ export type BoardHandle = {
   doc: Y.Doc
   items: Y.Map<Y.Map<unknown>>
   meta: Y.Map<unknown>
+  /** Group id to the name shown on its folder in the layer list. */
+  groups: Y.Map<string>
   /** Whatever the providers are up to, for anything that needs to re-render on it. */
   subscribe: (notify: () => void) => () => void
   provider: () => WebsocketProvider | null
@@ -88,6 +90,7 @@ export function useBoard(room: string): BoardHandle {
       doc,
       items: doc.getMap<Y.Map<unknown>>('items'),
       meta: doc.getMap('meta'),
+      groups: doc.getMap<string>('groups'),
       subscribe,
       provider: () => live.current?.ws ?? null,
       awareness: () => live.current?.ws.awareness ?? null,
@@ -132,6 +135,30 @@ function shallowSame(a: Item, b: Item) {
   return true
 }
 
+/** Every group's name, for the folders in the layer list. */
+export function useGroups(handle: BoardHandle): Record<string, string> {
+  const cache = useRef<Record<string, string>>({})
+
+  const read = () => {
+    const next = handle.groups.toJSON() as Record<string, string>
+    const keys = Object.keys(next)
+    const same =
+      keys.length === Object.keys(cache.current).length &&
+      keys.every((key) => cache.current[key] === next[key])
+    if (!same) cache.current = next
+    return cache.current
+  }
+
+  return useSyncExternalStore(
+    (notify) => {
+      handle.groups.observe(notify)
+      return () => handle.groups.unobserve(notify)
+    },
+    read,
+    () => cache.current,
+  )
+}
+
 /** The board's title, which anybody can rename. */
 export function useTitle(handle: BoardHandle): [string, (next: string) => void] {
   const title = useSyncExternalStore(
@@ -171,7 +198,19 @@ export function updateItem(handle: BoardHandle, id: string, patch: Partial<Item>
 }
 
 export function removeItems(handle: BoardHandle, ids: string[]) {
-  handle.doc.transact(() => ids.forEach((id) => handle.items.delete(id)))
+  handle.doc.transact(() => {
+    ids.forEach((id) => handle.items.delete(id))
+    // A folder with nothing left in it is a row in the layer list that cannot
+    // be clicked on or got rid of, so it goes when its last member does.
+    const used = new Set<string>()
+    handle.items.forEach((entry) => {
+      const group = entry.get('group')
+      if (typeof group === 'string') used.add(group)
+    })
+    handle.groups.forEach((_name, id) => {
+      if (!used.has(id)) handle.groups.delete(id)
+    })
+  })
 }
 
 export function bringToFront(handle: BoardHandle, ids: string[]) {
@@ -179,6 +218,48 @@ export function bringToFront(handle: BoardHandle, ids: string[]) {
   handle.doc.transact(() => {
     ids.forEach((id) => handle.items.get(id)?.set('z', z++))
   })
+}
+
+/**
+ * Push to the back of the stack.
+ *
+ * Below whatever is currently lowest rather than renumbering everything from
+ * zero: renumbering is a write per item on a shared document, and on a board of
+ * any size that is a lot of traffic to move one note behind another. z is
+ * allowed to go negative for exactly this reason.
+ */
+export function sendToBack(handle: BoardHandle, ids: string[]) {
+  let bottom = 0
+  handle.items.forEach((entry) => {
+    bottom = Math.min(bottom, (entry.get('z') as number) ?? 0)
+  })
+  handle.doc.transact(() => {
+    // Reversed so a multiple selection keeps its own internal order.
+    ;[...ids].reverse().forEach((id, i) => handle.items.get(id)?.set('z', bottom - 1 - i))
+  })
+}
+
+/** Tie several things together under one name. Returns the new group's id. */
+export function groupItems(handle: BoardHandle, ids: string[], name: string) {
+  const id = nanoid(8)
+  handle.doc.transact(() => {
+    handle.groups.set(id, name)
+    ids.forEach((member) => handle.items.get(member)?.set('group', id))
+  })
+  return id
+}
+
+export function ungroup(handle: BoardHandle, groupId: string) {
+  handle.doc.transact(() => {
+    handle.items.forEach((entry) => {
+      if (entry.get('group') === groupId) entry.delete('group')
+    })
+    handle.groups.delete(groupId)
+  })
+}
+
+export function renameGroup(handle: BoardHandle, groupId: string, name: string) {
+  handle.groups.set(groupId, name)
 }
 
 export function nextZ(handle: BoardHandle) {
@@ -190,9 +271,16 @@ export function nextZ(handle: BoardHandle) {
 }
 
 /** Replace the whole board — what an import does. */
-export function replaceAll(handle: BoardHandle, items: Item[], title?: string) {
+export function replaceAll(
+  handle: BoardHandle,
+  items: Item[],
+  title?: string,
+  groups?: Record<string, string>,
+) {
   handle.doc.transact(() => {
     handle.items.clear()
+    handle.groups.clear()
+    Object.entries(groups ?? {}).forEach(([id, name]) => handle.groups.set(id, name))
     items.forEach((item) => {
       const entry = new Y.Map<unknown>()
       Object.entries(item).forEach(([key, value]) => {
@@ -245,6 +333,70 @@ export function useConnected(handle: BoardHandle): boolean {
     handle.subscribe,
     () => handle.provider()?.wsconnected ?? false,
     () => false,
+  )
+}
+
+/* -------------------------------- history ------------------------------- */
+
+/**
+ * Undo and redo, over your own edits only.
+ *
+ * `UndoManager` tracks by the origin of each transaction, and the default is
+ * local ones. That is the behaviour you want on a shared board and the opposite
+ * of what a naive history would do: undo must never reach across and take back
+ * something somebody else did, which is why history cannot simply be a stack of
+ * document states.
+ *
+ * The manager is made during render — it is bookkeeping over a map that already
+ * exists, not a connection — and torn down on unmount.
+ */
+export function useHistory(handle: BoardHandle) {
+  const [manager] = useState(() => new Y.UndoManager(handle.items, { captureTimeout: 500 }))
+
+  useEffect(() => () => manager.destroy(), [manager])
+
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      manager.on('stack-item-added', notify)
+      manager.on('stack-item-popped', notify)
+      manager.on('stack-cleared', notify)
+      return () => {
+        manager.off('stack-item-added', notify)
+        manager.off('stack-item-popped', notify)
+        manager.off('stack-cleared', notify)
+      }
+    },
+    [manager],
+  )
+
+  const canUndo = useSyncExternalStore(
+    subscribe,
+    () => manager.undoStack.length > 0,
+    () => false,
+  )
+  const canRedo = useSyncExternalStore(
+    subscribe,
+    () => manager.redoStack.length > 0,
+    () => false,
+  )
+
+  return useMemo(
+    () => ({
+      canUndo,
+      canRedo,
+      undo: () => manager.undo(),
+      redo: () => manager.redo(),
+      /**
+       * End the current undo step.
+       *
+       * The capture window exists so that the hundred writes a drag makes come
+       * back as one undo. Discrete acts have to close it by hand, or placing
+       * three notes in quick succession merges into a single step and one undo
+       * takes back all three.
+       */
+      seal: () => manager.stopCapturing(),
+    }),
+    [manager, canUndo, canRedo],
   )
 }
 
