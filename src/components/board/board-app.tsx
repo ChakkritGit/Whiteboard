@@ -28,7 +28,7 @@ import { saveMe, type Me } from '@/lib/identity'
 import { download, readFile } from '@/lib/io'
 import { BoardItem, type Corner } from './board-item'
 import { ContextMenu, type MenuEntry } from './menu'
-import { Cursors, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
+import { Cursors, GlassFilter, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
@@ -124,6 +124,25 @@ export function BoardApp({ room }: { room: string }) {
 
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
   const ink: Swatch = tinted ? color : 'slate'
+
+  /**
+   * Your own pointer, in your own colour.
+   *
+   * Everyone else on the board is a coloured arrow with a name on it, and you
+   * were the one person still driving the operating system's plain black one —
+   * so the colour that identifies you to the room was the one colour you never
+   * saw. Same arrow, same colour, drawn as the cursor itself.
+   *
+   * `5 2` is the hotspot: the tip of the arrow in the path below, and where the
+   * click actually lands.
+   */
+  const arrow = useMemo(() => {
+    const svg =
+      `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>` +
+      `<path d='M5 2l14 8.5-6.2 1.4L9.8 19 5 2Z' fill='${me.color}' stroke='white' stroke-width='1.5' stroke-linejoin='round'/>` +
+      `</svg>`
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 5 2, default`
+  }, [me.color])
 
   /* ------------------------------ geometry ------------------------------ */
 
@@ -995,9 +1014,15 @@ export function BoardApp({ room }: { room: string }) {
     ? panning
       ? 'grabbing'
       : 'grab'
-    : tool === 'select' || tool === 'eraser'
-      ? 'default'
-      : 'crosshair'
+    : tool === 'select'
+      ? // Gated on `mounted`: the colour comes from local storage, so drawing it
+        // into the server's HTML would be a hydration mismatch.
+        mounted
+        ? arrow
+        : 'default'
+      : tool === 'eraser'
+        ? 'default'
+        : 'crosshair'
 
   const showType =
     tool === 'text' ||
@@ -1009,6 +1034,8 @@ export function BoardApp({ room }: { room: string }) {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden">
+      <GlassFilter />
+
       <TopBar
         title={title}
         onTitle={setTitle}

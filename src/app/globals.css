@@ -39,6 +39,8 @@
   --glass-rim-soft: rgb(255 255 255 / 0.25);
   --glass-shadow: 16 24 40;
   --glass-shadow-strength: 0.09;
+  /* How thick the pane reads as being: the band the light bends in. */
+  --glass-rim-width: 14px;
   color-scheme: light;
 }
 
@@ -59,6 +61,7 @@
   --glass-rim-soft: rgb(255 255 255 / 0.06);
   --glass-shadow: 0 0 0;
   --glass-shadow-strength: 0.5;
+  --glass-rim-width: 14px;
   color-scheme: dark;
 }
 
@@ -139,7 +142,10 @@ textarea,
   .glass {
     position: relative;
     isolation: isolate;
-    background: var(--glass-fill);
+    background:
+      radial-gradient(120% 90% at 18% -20%, var(--glass-sheen), transparent 62%),
+      linear-gradient(180deg, var(--glass-sheen), transparent 45%),
+      var(--glass-fill);
     -webkit-backdrop-filter: var(--glass-filter);
     backdrop-filter: var(--glass-filter);
     border: 1px solid var(--glass-edge);
@@ -149,17 +155,43 @@ textarea,
       0 24px 48px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.8));
   }
 
+  /**
+   * The bend, confined to the rim.
+   *
+   * Real glass does not only dim what is behind it, it *moves* it — and it does
+   * so where the pane is thickest, at the edge. That is geometry, and no amount
+   * of blur imitates it, so what is behind this ring is run through an SVG
+   * displacement map (`#glass-warp`, rendered once by the board).
+   *
+   * A ring rather than the whole panel, and a ring of fixed width. Displacing
+   * the whole panel spread the distortion across its entire area — on a tall
+   * layer list that is two hundred pixels of smeared colour, which reads as a
+   * dirty lens rather than a thick edge. Masked to `--glass-rim-width` the
+   * distortion has nowhere to go but the edge, whatever size the panel is.
+   *
+   * Deliberately on this layer and not on `.glass` itself: a browser that will
+   * not resolve a filter reference inside `backdrop-filter` drops the whole
+   * chain it appears in, so putting it here means such a browser loses the bend
+   * and keeps the blur, rather than ending up with a flat pane of tinted
+   * plastic.
+   */
   .glass::before {
     content: '';
     position: absolute;
     inset: 0;
-    z-index: -1;
     border-radius: inherit;
+    padding: var(--glass-rim-width);
     pointer-events: none;
-    background:
-      radial-gradient(120% 90% at 18% -20%, var(--glass-sheen), transparent 62%),
-      linear-gradient(180deg, var(--glass-sheen), transparent 45%);
-    opacity: 0.85;
+    -webkit-backdrop-filter: url('#glass-warp') brightness(1.05);
+    backdrop-filter: url('#glass-warp') brightness(1.05);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
   }
 
   .glass::after {
