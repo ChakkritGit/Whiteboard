@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE, SWATCHES } from '@/lib/palette'
 import type { Me } from '@/lib/identity'
+import { Logo } from './logo'
 
 /* --------------------------------- top --------------------------------- */
 
@@ -16,6 +17,7 @@ export function TopBar({
   zoom,
   onZoom,
   onFit,
+  onReset,
   onExport,
   onImport,
   onShare,
@@ -30,6 +32,7 @@ export function TopBar({
   zoom: number
   onZoom: (next: number) => void
   onFit: () => void
+  onReset: () => void
   onExport: () => void
   onImport: (file: File) => void
   onShare: () => void
@@ -42,8 +45,8 @@ export function TopBar({
   const shown = everyone.slice(0, 4)
 
   return (
-    <header className="pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-[#e5e3df] bg-white/85 px-3 backdrop-blur-md">
-      <div className="size-8 shrink-0 rounded-lg bg-[#6366f1]" aria-hidden />
+    <header className="glass glass-flat pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-x-0 border-t-0 px-3">
+      <Logo size={30} />
 
       <input
         value={title}
@@ -93,9 +96,14 @@ export function TopBar({
           >
             −
           </button>
-          <span className="w-12 text-center text-xs font-semibold tabular-nums">
+          <button
+            type="button"
+            onClick={onReset}
+            title="Back to 100%"
+            className="w-12 text-center text-xs font-semibold tabular-nums hover:text-[#4f46e5]"
+          >
             {Math.round(zoom * 100)}%
-          </span>
+          </button>
           <button
             type="button"
             onClick={() => onZoom(zoom * 1.2)}
@@ -106,9 +114,19 @@ export function TopBar({
           </button>
         </div>
 
-        <IconButton label="Fit to content" onClick={onFit}>
-          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-        </IconButton>
+        {/* Named rather than an icon on its own: getting lost on an infinite
+            canvas is the one thing you need a way out of, and a glyph is a poor
+            place to hide it. */}
+        <button
+          type="button"
+          onClick={onFit}
+          className="flex items-center gap-1.5 rounded-lg border border-[#e5e3df] px-2.5 py-1.5 text-xs font-semibold text-[#4b5563] hover:bg-white/70"
+        >
+          <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+          </svg>
+          Fit
+        </button>
 
         <IconButton label="Export board" onClick={onExport}>
           <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
@@ -221,7 +239,7 @@ export function ToolDock({
   return (
     <div className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
       {palette && (
-        <div className="panel mb-2 grid grid-cols-5 gap-1.5 rounded-xl p-2">
+        <div className="glass mb-2 grid grid-cols-5 gap-1.5 rounded-xl p-2">
           {SWATCHES.map((swatch) => (
             <button
               key={swatch}
@@ -240,7 +258,7 @@ export function ToolDock({
         </div>
       )}
 
-      <div className="panel flex items-center gap-0.5 rounded-2xl px-2 py-1.5">
+      <div className="glass flex items-center gap-0.5 rounded-2xl px-2 py-1.5">
         {TOOLS.map((entry) => (
           <button
             key={entry.id}
@@ -362,7 +380,7 @@ export function MiniMap({
   const at = (x: number, y: number) => ({ left: (x - minX) * scale + 6, top: (y - minY) * scale + 6 })
 
   return (
-    <div className="panel pointer-events-none absolute right-4 bottom-5 z-30 rounded-xl p-1.5">
+    <div className="glass pointer-events-none absolute right-4 bottom-5 z-30 rounded-xl p-1.5">
       <p className="px-1 pb-1 text-[10px] font-semibold tracking-wide text-[#6b7280] uppercase">Map</p>
       <div className="relative overflow-hidden rounded-lg bg-[#f4f2ee]" style={{ width: W, height: H }}>
         {items.map((item) => (
@@ -389,43 +407,168 @@ export function MiniMap({
 
 /* ------------------------------- left rail ------------------------------ */
 
-export function LeftRail({ count, people }: { count: number; people: number }) {
+/**
+ * The rail, and the panel it opens.
+ *
+ * Two things you cannot otherwise get at on an infinite canvas: who else is here,
+ * and what is on the board when it has scrolled out of sight. The layer list
+ * doubles as a way back to something — clicking a row brings it into view, which
+ * is the only reliable way to find a note you have lost.
+ */
+export function LeftRail({
+  items,
+  people,
+  me,
+  onRename,
+  onFocus,
+  onSelect,
+  selection,
+  mounted,
+}: {
+  items: Item[]
+  people: Presence[]
+  me: Me
+  onRename: (name: string) => void
+  onFocus: (id: string) => void
+  onSelect: (id: string) => void
+  selection: string[]
+  mounted: boolean
+}) {
+  const [open, setOpen] = useState<'people' | 'layers' | null>(null)
+
   return (
-    <aside className="pointer-events-auto absolute top-14 bottom-0 left-0 z-20 flex w-12 flex-col items-center gap-1 border-r border-[#e5e3df] bg-white/70 py-3 backdrop-blur-md">
-      <RailStat label="Items on the board" value={count}>
-        <path d="M12 3l9 5-9 5-9-5 9-5ZM3 13l9 5 9-5" />
-      </RailStat>
-      <RailStat label="People here" value={people}>
-        <path d="M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-      </RailStat>
-    </aside>
+    <>
+      <aside className="glass glass-flat pointer-events-auto absolute top-14 bottom-0 left-0 z-20 flex w-12 flex-col items-center gap-1 border-y-0 border-l-0 py-3">
+        <RailButton
+          label="People"
+          count={people.length + 1}
+          active={open === 'people'}
+          onClick={() => setOpen((v) => (v === 'people' ? null : 'people'))}
+        >
+          <path d="M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+        </RailButton>
+        <RailButton
+          label="Layers"
+          count={items.length}
+          active={open === 'layers'}
+          onClick={() => setOpen((v) => (v === 'layers' ? null : 'layers'))}
+        >
+          <path d="M12 3l9 5-9 5-9-5 9-5ZM3 13l9 5 9-5" />
+        </RailButton>
+      </aside>
+
+      {open && (
+        <div className="glass pointer-events-auto absolute top-16 bottom-4 left-14 z-20 flex w-60 flex-col rounded-xl">
+          <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
+            {open === 'people' ? 'In this room' : 'On the board'}
+          </p>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
+            {open === 'people' ? (
+              <ul className="space-y-0.5">
+                {/* Your own row is the one you can type in. There is no account
+                    behind the name — it is kept on this machine and sent to the
+                    room, and that is the whole of it. */}
+                <li className="flex items-center gap-2 rounded-lg px-1.5 py-1.5">
+                  <Dot color={me.color} initials={me.initials} />
+                  <input
+                    value={mounted ? me.name : ''}
+                    onChange={(event) => onRename(event.target.value)}
+                    aria-label="Your name"
+                    className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-0.5 text-sm font-semibold outline-none hover:bg-white/70 focus:bg-white"
+                  />
+                  <span className="text-[10px] font-semibold text-[#9ca3af]">you</span>
+                </li>
+                {mounted &&
+                  people.map((peer, i) => (
+                    <li key={`${peer.name}-${i}`} className="flex items-center gap-2 px-1.5 py-1.5">
+                      <Dot color={peer.color} initials={peer.initials} />
+                      <span className="min-w-0 flex-1 truncate px-1 text-sm">{peer.name}</span>
+                      {peer.cursor && <span className="size-1.5 rounded-full bg-[#10b981]" title="On the board" />}
+                    </li>
+                  ))}
+              </ul>
+            ) : items.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-[#6b7280]">Nothing on the board yet.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {[...items].reverse().map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelect(item.id)
+                        onFocus(item.id)
+                      }}
+                      className={`flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm ${
+                        selection.includes(item.id) ? 'bg-[#eef2ff]' : 'hover:bg-white/70'
+                      }`}
+                    >
+                      <span
+                        className="size-3.5 shrink-0 rounded-[3px] border border-black/10"
+                        style={{
+                          background: item.kind === 'frame' ? 'transparent' : PALETTE[item.color]?.dot,
+                          borderStyle: item.kind === 'frame' ? 'dashed' : 'solid',
+                        }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.text || kindName(item.kind)}</span>
+                      <span className="text-[10px] text-[#9ca3af]">{kindName(item.kind)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
-function RailStat({
+function kindName(kind: Item['kind']) {
+  return kind === 'sticky' ? 'note' : kind === 'shape' ? 'box' : kind
+}
+
+function Dot({ color, initials }: { color: string; initials: string }) {
+  return (
+    <span
+      className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"
+      style={{ background: color }}
+    >
+      {initials}
+    </span>
+  )
+}
+
+function RailButton({
   label,
-  value,
+  count,
+  active,
+  onClick,
   children,
 }: {
   label: string
-  value: number
+  count: number
+  active: boolean
+  onClick: () => void
   children: React.ReactNode
 }) {
   return (
-    <div title={`${label}: ${value}`} className="grid w-full place-items-center py-1.5 text-[#6b7280]">
-      <svg
-        viewBox="0 0 24 24"
-        className="size-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`grid w-10 place-items-center rounded-lg py-1.5 ${
+        active ? 'bg-[#eef2ff] text-[#4f46e5]' : 'text-[#6b7280] hover:bg-white/70'
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         {children}
       </svg>
-      <span className="mt-0.5 text-[10px] font-semibold tabular-nums">{value}</span>
-    </div>
+      <span className="mt-0.5 text-[10px] font-semibold tabular-nums">{count}</span>
+    </button>
   )
 }
 
@@ -440,7 +583,7 @@ export function Toast({ message, onDone }: { message: string | null; onDone: () 
 
   if (!message) return null
   return (
-    <div className="panel absolute bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-lg px-3.5 py-2 text-sm">
+    <div className="glass absolute bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-lg px-3.5 py-2 text-sm">
       {message}
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Camera, Item, Swatch } from '@/lib/types'
+import { PALETTE } from '@/lib/palette'
 import {
   addItem,
   bringToFront,
@@ -16,6 +17,7 @@ import {
   usePeers,
   useTitle,
 } from '@/lib/board'
+import { saveMe, type Me } from '@/lib/identity'
 import { download, readFile } from '@/lib/io'
 import { BoardItem } from './board-item'
 import { Cursors, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
@@ -36,7 +38,8 @@ export function BoardApp({ room }: { room: string }) {
   const items = useItems(board)
   const peers = usePeers(board)
   const live = useConnected(board)
-  const me = useMe()
+  const initialMe = useMe()
+  const [me, setMe] = useState<Me>(initialMe)
   const mounted = useMounted()
   const [title, setTitle] = useTitle(board)
 
@@ -52,7 +55,17 @@ export function BoardApp({ room }: { room: string }) {
   const surface = useRef<HTMLDivElement>(null)
   const drag = useRef<{ ids: string[]; from: { x: number; y: number }; start: Map<string, { x: number; y: number }> } | null>(null)
   const pan = useRef<{ x: number; y: number; camera: Camera } | null>(null)
-  const drawing = useRef<{ id: string; points: number[] } | null>(null)
+  const drawing = useRef<{ id: string; points: number[]; sent: number } | null>(null)
+  /**
+   * The stroke currently under the pen, drawn straight to the screen.
+   *
+   * Ink has to keep up with the hand, and it cannot if every pointer move has to
+   * go into the document and come back as a re-render of the whole board — the
+   * line arrived in visible steps behind the cursor. The person drawing sees this
+   * local copy at the full pointer rate; the document is caught up a few times a
+   * second so the room can watch the line grow, and settled exactly on release.
+   */
+  const [draft, setDraft] = useState<{ points: number[]; width: number; highlight: boolean; color: Swatch } | null>(null)
   /**
    * A note made by this press, waiting for the press to finish before it is put
    * into edit mode. Setting it straight away focuses the note mid-click, and the
@@ -131,6 +144,50 @@ export function BoardApp({ room }: { room: string }) {
     })
   }, [items, viewport])
 
+  /** Write a stroke's path and the box it fits in. */
+  const commitStroke = useCallback(
+    (id: string, points: number[]) => {
+      const xs = points.filter((_, i) => i % 2 === 0)
+      const ys = points.filter((_, i) => i % 2 === 1)
+      updateItem(board, id, {
+        points,
+        x: Math.min(...xs),
+        y: Math.min(...ys),
+        w: Math.max(1, Math.max(...xs) - Math.min(...xs)),
+        h: Math.max(1, Math.max(...ys) - Math.min(...ys)),
+      })
+    },
+    [board],
+  )
+
+  // A new name has to reach the room even if the pointer never moves again.
+  useEffect(() => {
+    board.awareness()?.setLocalStateField('user', {
+      name: me.name,
+      initials: me.initials,
+      color: me.color,
+      cursor: null,
+      selection,
+    })
+    // `selection` deliberately absent: it rides along on pointer moves, and
+    // adding it here would re-broadcast on every click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, me])
+
+  /** Centre the view on one item, which is how the layer list finds things. */
+  const focusOn = useCallback(
+    (id: string) => {
+      const item = items.find((entry) => entry.id === id)
+      if (!item) return
+      setCamera((current) => ({
+        zoom: current.zoom,
+        x: viewport.w / 2 - (item.x + item.w / 2) * current.zoom,
+        y: viewport.h / 2 - (item.y + item.h / 2) * current.zoom,
+      }))
+    },
+    [items, viewport],
+  )
+
   /* ------------------------------ pointers ------------------------------ */
 
   const onSurfaceDown = (event: React.PointerEvent) => {
@@ -151,6 +208,7 @@ export function BoardApp({ room }: { room: string }) {
     const at = toWorld(event.clientX, event.clientY)
 
     if (tool === 'pen' || tool === 'highlighter') {
+      const width = tool === 'highlighter' ? 14 : 3
       const id = addItem(board, {
         kind: 'stroke',
         x: at.x,
@@ -160,10 +218,11 @@ export function BoardApp({ room }: { room: string }) {
         text: '',
         color,
         points: [at.x, at.y],
-        stroke: tool === 'highlighter' ? 14 : 3,
+        stroke: width,
         highlight: tool === 'highlighter',
       })
-      drawing.current = { id, points: [at.x, at.y] }
+      drawing.current = { id, points: [at.x, at.y], sent: 2 }
+      setDraft({ points: [at.x, at.y], width, highlight: tool === 'highlighter', color })
       surface.current?.setPointerCapture(event.pointerId)
       return
     }
@@ -208,15 +267,18 @@ export function BoardApp({ room }: { room: string }) {
     if (drawing.current) {
       const stroke = drawing.current
       stroke.points.push(at.x, at.y)
-      const xs = stroke.points.filter((_, i) => i % 2 === 0)
-      const ys = stroke.points.filter((_, i) => i % 2 === 1)
-      updateItem(board, stroke.id, {
-        points: stroke.points,
-        x: Math.min(...xs),
-        y: Math.min(...ys),
-        w: Math.max(1, Math.max(...xs) - Math.min(...xs)),
-        h: Math.max(1, Math.max(...ys) - Math.min(...ys)),
-      })
+      setDraft((current) => (current ? { ...current, points: stroke.points.slice() } : current))
+
+      // Caught up every twelfth point rather than on every move: the whole path
+      // goes into the document each time, so at pointer rate a long stroke is
+      // resent hundreds of times and the board stutters for everyone in it.
+      // Counted in points rather than milliseconds because a clock is not
+      // something a component may read, and the count is the thing that actually
+      // decides how much there is to send.
+      if (stroke.points.length - stroke.sent >= 24) {
+        stroke.sent = stroke.points.length
+        commitStroke(stroke.id, stroke.points)
+      }
       return
     }
 
@@ -237,7 +299,13 @@ export function BoardApp({ room }: { room: string }) {
     }
     pan.current = null
     drag.current = null
+    const finished = drawing.current
     drawing.current = null
+
+    if (finished) {
+      commitStroke(finished.id, finished.points)
+      setDraft(null)
+    }
 
     if (pendingEdit.current) {
       setEditing(pendingEdit.current)
@@ -383,6 +451,7 @@ export function BoardApp({ room }: { room: string }) {
         zoom={camera.zoom}
         onZoom={(next) => zoomAt(next, viewport.w / 2, viewport.h / 2)}
         onFit={fit}
+        onReset={() => setCamera({ x: 0, y: 0, zoom: 1 })}
         onExport={() => download(items, title)}
         onImport={onImport}
         onShare={onShare}
@@ -390,7 +459,24 @@ export function BoardApp({ room }: { room: string }) {
         mounted={mounted}
       />
 
-      <LeftRail count={items.length} people={peers.length + 1} />
+      <LeftRail
+        items={items}
+        people={peers}
+        me={me}
+        mounted={mounted}
+        selection={selection}
+        onRename={(name) => {
+          const next: Me = {
+            ...me,
+            name,
+            initials: name.trim().split(/\s+/).map((word) => word[0] ?? '').join('').slice(0, 2) || '?',
+          }
+          setMe(next)
+          saveMe(next)
+        }}
+        onSelect={(id) => setSelection([id])}
+        onFocus={focusOn}
+      />
 
       <div
         ref={surface}
@@ -420,6 +506,22 @@ export function BoardApp({ room }: { room: string }) {
               onChange={(text) => updateItem(board, item.id, { text })}
             />
           ))}
+          {draft && draft.points.length >= 4 && (
+            <svg className="pointer-events-none absolute overflow-visible" style={{ left: 0, top: 0, zIndex: 9999 }}>
+              <path
+                d={draft.points.reduce(
+                  (path, value, i) => (i % 2 === 0 ? `${path}${i === 0 ? 'M' : 'L'}${value} ` : `${path}${value} `),
+                  '',
+                )}
+                fill="none"
+                stroke={draft.highlight ? PALETTE[draft.color].dot : '#1f2430'}
+                strokeWidth={draft.width}
+                strokeOpacity={draft.highlight ? 0.45 : 1}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </div>
 
         <Cursors peers={peers} camera={camera} />

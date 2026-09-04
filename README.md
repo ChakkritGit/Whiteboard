@@ -23,6 +23,26 @@ npm run dev              # http://localhost:3000
 Point the browser at `/` and it sends you to a fresh board. `NEXT_PUBLIC_WS_URL`
 moves the room server somewhere else.
 
+## Deploying it
+
+Two things ship, and they cannot both go to the same place.
+
+The site is an ordinary Next.js app — Vercel, Netlify, anywhere. The room server
+is a process that has to stay alive holding open websockets, which serverless
+functions cannot do. Put it somewhere that runs a container or a long-lived
+process (Railway, Render, Fly, a VPS), then point the site at it:
+
+```
+NEXT_PUBLIC_WS_URL=wss://rooms.example.com
+```
+
+`wss://`, not `ws://`: a page served over HTTPS is not allowed to open an
+unencrypted socket, so the board will simply never connect if this is wrong.
+
+Until that is set the site still works — the board is kept in IndexedDB and
+everything but other people is there — but a shared link opens an empty board,
+because nothing is relaying between browsers.
+
 ## How it holds together
 
 - **The room is the URL.** There is no account, no session and no database of
