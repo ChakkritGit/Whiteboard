@@ -33,7 +33,16 @@ export type BoardHandle = {
   awareness: () => WebsocketProvider['awareness'] | null
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:1234'
+/**
+ * Where the rooms are.
+ *
+ * Exported because "which server am I actually talking to?" is otherwise
+ * unanswerable from the running app, and it is the first thing worth knowing
+ * when the room behaves like an older build than the one you deployed — a stale
+ * `NEXT_PUBLIC_WS_URL` sends a production page at a laptop's localhost, and it
+ * connects, and it says Live.
+ */
+export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:1234'
 
 /**
  * The document is made during render and the connections in an effect.

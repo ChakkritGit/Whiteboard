@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE, SWATCHES } from '@/lib/palette'
+import { WS_URL } from '@/lib/board'
 import type { Me } from '@/lib/identity'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { Logo } from './logo'
@@ -60,7 +61,8 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-2">
         <span
-          className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
+          title={live ? `Connected to ${WS_URL}` : `Not connected to ${WS_URL}`}
+          className={`hidden cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
             live
               ? 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7]'
               : 'bg-canvas text-muted'
