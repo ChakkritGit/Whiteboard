@@ -40,18 +40,35 @@ export function ContextMenu({
   }, [entries])
 
   useEffect(() => {
-    const dismiss = () => onClose()
+    /**
+     * Listened for on the way *down*, not on the way up.
+     *
+     * Half the board stops pointer events from propagating — a note does it so
+     * that pressing on it starts a drag rather than a pan, and a resize grip
+     * does it so that it resizes rather than drags. A listener on `window` in
+     * the bubble phase therefore never hears about a click on any of them, and
+     * the menu stayed open until you happened to click bare canvas. In the
+     * capture phase the event reaches here first, before anything downstream
+     * gets the chance to swallow it.
+     *
+     * Which makes the containment check load-bearing: without it, pressing a
+     * menu item would close the menu before the click that chose it landed.
+     */
+    const outside = (event: Event) => {
+      if (panel.current?.contains(event.target as Node)) return
+      onClose()
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     // `pointerdown` rather than `click`: a click that lands on the board would
     // otherwise start a drag underneath the menu on its way to closing it.
-    window.addEventListener('pointerdown', dismiss)
-    window.addEventListener('wheel', dismiss)
+    window.addEventListener('pointerdown', outside, true)
+    window.addEventListener('wheel', outside, true)
     window.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('pointerdown', dismiss)
-      window.removeEventListener('wheel', dismiss)
+      window.removeEventListener('pointerdown', outside, true)
+      window.removeEventListener('wheel', outside, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [onClose])
@@ -64,7 +81,8 @@ export function ContextMenu({
   return (
     <div
       ref={panel}
-      // Stops the window-level dismissal from firing for clicks inside.
+      // Kept off the board underneath: without this, pressing a menu item also
+      // starts a drag on whatever the menu is covering.
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
       className="glass pointer-events-auto fixed z-50 min-w-52 rounded-xl p-1 text-sm"
