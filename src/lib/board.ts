@@ -168,15 +168,22 @@ export function useGroups(handle: BoardHandle): Record<string, string> {
   )
 }
 
-/** The board's title, which anybody can rename. */
+/**
+ * The board's title, which anybody can rename.
+ *
+ * Empty until somebody names it, rather than defaulting to "Untitled board".
+ * The default is the one part of this that is not shared: it is shown to a
+ * reader in the reader's own language, as a placeholder, while the title itself
+ * is board content and the same for everyone.
+ */
 export function useTitle(handle: BoardHandle): [string, (next: string) => void] {
   const title = useSyncExternalStore(
     (notify) => {
       handle.meta.observe(notify)
       return () => handle.meta.unobserve(notify)
     },
-    () => (handle.meta.get('title') as string) ?? 'Untitled board',
-    () => 'Untitled board',
+    () => (handle.meta.get('title') as string) ?? '',
+    () => '',
   )
   return [title, (next: string) => handle.meta.set('title', next)]
 }

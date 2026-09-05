@@ -220,7 +220,22 @@ textarea,
     mask-composite: exclude;
   }
 
-  /* Where a panel meets an edge of the screen it loses the shadow on that side. */
+  /**
+   * Panels anchored to an edge of the screen: the top bar, the rail.
+   *
+   * They lose the shadow on the side they meet, and they lose both the sheen and
+   * the rim entirely. Those two are drawn per panel and start over at each
+   * panel's own top-left corner, so where the rail meets the bar underneath it
+   * you got a bright line from the bar's rim, a second from the rail's, and a
+   * fresh highlight down the rail that made it read as a lighter, separate
+   * surface. Anchored chrome should look like one continuous pane; the 1px
+   * `border` on the meeting side is the whole of the join it needs.
+   */
+  .glass-flat::before,
+  .glass-flat::after {
+    content: none;
+  }
+
   .glass-flat {
     box-shadow: 0 1px 2px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.5)),
       0 8px 20px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.7));

@@ -1,14 +1,22 @@
 import type { MetadataRoute } from 'next'
 import { SITE } from '@/lib/site'
 
-/** One page, because one page is all there is to find. */
+/**
+ * Two pages, one in each language, each naming the other.
+ *
+ * The `alternates` block is what tells a search engine these are the same page
+ * in two languages rather than two pages that happen to overlap — without it the
+ * Thai one competes with the English one instead of serving Thai readers.
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
+  const languages = { en: SITE.url, th: `${SITE.url}/th` }
+  const common = {
+    lastModified: new Date(),
+    changeFrequency: 'monthly' as const,
+    alternates: { languages },
+  }
   return [
-    {
-      url: SITE.url,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 1,
-    },
+    { url: SITE.url, priority: 1, ...common },
+    { url: `${SITE.url}/th`, priority: 0.9, ...common },
   ]
 }

@@ -43,6 +43,20 @@ export function download(items: Item[], title: string, groups?: Record<string, s
  * takes in something it did not write, and a missing `x` would put a note at
  * `NaN` where nobody could ever find or select it again.
  */
+/**
+ * Why a file was refused, as a code rather than a sentence.
+ *
+ * The message has to be shown in the reader's language, and this module has no
+ * business knowing which one that is — so it names the problem and lets the
+ * caller find the words.
+ */
+export class BadFile extends Error {
+  constructor(readonly code: 'notJson' | 'notOurs' | 'newer' | 'noItems' | 'damaged', readonly detail?: string) {
+    super(code)
+    this.name = 'BadFile'
+  }
+}
+
 export async function readFile(
   file: File,
 ): Promise<{ items: Item[]; title: string; groups: Record<string, string> }> {
@@ -52,20 +66,20 @@ export async function readFile(
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error('That file is not JSON.')
+    throw new BadFile('notJson')
   }
 
   if (!isRecord(data) || data.format !== 'whiteboard') {
-    throw new Error('That is not a whiteboard file.')
+    throw new BadFile('notOurs')
   }
   if (data.version !== 1) {
-    throw new Error(`This board was written by a newer version (${String(data.version)}).`)
+    throw new BadFile('newer', String(data.version))
   }
-  if (!Array.isArray(data.items)) throw new Error('That file has no items in it.')
+  if (!Array.isArray(data.items)) throw new BadFile('noItems')
 
   const items = data.items.filter(isItem)
   if (items.length !== data.items.length) {
-    throw new Error('Some items in that file are damaged.')
+    throw new BadFile('damaged')
   }
 
   // Groups arrived after version 1 shipped, so a file without them is a valid

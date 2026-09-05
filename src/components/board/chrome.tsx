@@ -6,6 +6,8 @@ import { PALETTE, SWATCHES } from '@/lib/palette'
 import { WS_URL } from '@/lib/board'
 import type { Me } from '@/lib/identity'
 import { useTheme, type ThemeMode } from '@/lib/theme'
+import { useLang } from '@/lib/i18n'
+import { DICT, type Lang } from '@/lib/dictionary'
 import { Logo } from './logo'
 
 /* --------------------------------- top --------------------------------- */
@@ -44,6 +46,7 @@ export function TopBar({
   /** False during the server render; see the avatar row. */
   mounted: boolean
 }) {
+  const { t } = useLang()
   const file = useRef<HTMLInputElement>(null)
   const everyone = [{ initials: me.initials, color: me.color, name: me.name }, ...peers]
   const shown = everyone.slice(0, 4)
@@ -55,13 +58,14 @@ export function TopBar({
       <input
         value={title}
         onChange={(event) => onTitle(event.target.value)}
-        aria-label="Board title"
+        placeholder={t.untitled}
+        aria-label={t.boardTitle}
         className="min-w-0 max-w-[18rem] flex-1 rounded-md px-2 py-1 text-[15px] font-semibold outline-none hover:bg-canvas focus:bg-canvas sm:flex-none"
       />
 
       <div className="ml-auto flex items-center gap-2">
         <span
-          title={live ? `Connected to ${WS_URL}` : `Not connected to ${WS_URL}`}
+          title={live ? t.connectedTo(WS_URL) : t.notConnectedTo(WS_URL)}
           className={`hidden cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
             live
               ? 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7]'
@@ -69,7 +73,7 @@ export function TopBar({
           }`}
         >
           <span className={`size-1.5 rounded-full ${live ? 'bg-[#10b981]' : 'bg-[#9ca3af]'}`} />
-          {live ? 'Live' : 'Offline'}
+          {live ? t.live : t.offline}
         </span>
 
         {/* Everyone in the room, and only once there is a browser to ask: the
@@ -94,13 +98,15 @@ export function TopBar({
           )}
         </div>
 
+        <LanguageSwitch mounted={mounted} />
+
         <ThemeSwitch mounted={mounted} />
 
         <div className="hidden items-center rounded-lg border border-line sm:flex">
           <button
             type="button"
             onClick={() => onZoom(zoom / 1.2)}
-            aria-label="Zoom out"
+            aria-label={t.zoomOut}
             className="px-2 py-1 text-sm text-muted hover:text-ink"
           >
             −
@@ -108,7 +114,7 @@ export function TopBar({
           <button
             type="button"
             onClick={onReset}
-            title="Back to 100%"
+            title={t.resetZoom}
             className="w-12 text-center text-xs font-semibold tabular-nums hover:text-accent"
           >
             {Math.round(zoom * 100)}%
@@ -116,7 +122,7 @@ export function TopBar({
           <button
             type="button"
             onClick={() => onZoom(zoom * 1.2)}
-            aria-label="Zoom in"
+            aria-label={t.zoomIn}
             className="px-2 py-1 text-sm text-muted hover:text-ink"
           >
             +
@@ -124,11 +130,11 @@ export function TopBar({
         </div>
 
         <div className="hidden items-center rounded-lg border border-line sm:flex">
-          <HistoryButton label="Undo" disabled={!history.canUndo} onClick={history.undo}>
+          <HistoryButton label={t.undo} disabled={!history.canUndo} onClick={history.undo}>
             <path d="M9 14 4 9l5-5M4 9h9a7 7 0 0 1 0 14h-3" />
           </HistoryButton>
           <span className="h-5 w-px bg-line" />
-          <HistoryButton label="Redo" disabled={!history.canRedo} onClick={history.redo}>
+          <HistoryButton label={t.redo} disabled={!history.canRedo} onClick={history.redo}>
             <path d="m15 14 5-5-5-5m5 5h-9a7 7 0 0 0 0 14h3" />
           </HistoryButton>
         </div>
@@ -144,14 +150,14 @@ export function TopBar({
           <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
           </svg>
-          Fit
+          {t.fit}
         </button>
 
-        <IconButton label="Export board" onClick={onExport}>
+        <IconButton label={t.exportBoard} onClick={onExport}>
           <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
         </IconButton>
 
-        <IconButton label="Import board" onClick={() => file.current?.click()}>
+        <IconButton label={t.importBoard} onClick={() => file.current?.click()}>
           <path d="M12 20V9M8 13l4-4 4 4M5 4h14" />
         </IconButton>
         <input
@@ -172,7 +178,7 @@ export function TopBar({
           onClick={onShare}
           className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-white hover:brightness-110"
         >
-          {shared ? 'Link copied' : 'Share'}
+          {shared ? t.linkCopied : t.share}
         </button>
       </div>
     </header>
@@ -190,22 +196,26 @@ export function TopBar({
 // Named "Light theme" rather than "Light": the type controls in the dock have a
 // weight by that name, and two buttons on one screen answering to the same name
 // is ambiguous to anyone driving this by voice or by screen reader.
-const MODES: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
+const MODES: { id: ThemeMode; icon: React.ReactNode }[] = [
   {
     id: 'light',
-    label: 'Light theme',
     icon: <path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7 1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2-1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />,
   },
-  { id: 'dark', label: 'Dark theme', icon: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" /> },
+  { id: 'dark', icon: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" /> },
   {
     id: 'system',
-    label: 'Match the system',
     icon: <path d="M4 5h16v10H4zM9 19h6M12 15v4" />,
   },
 ]
 
 function ThemeSwitch({ mounted }: { mounted: boolean }) {
   const { mode, setMode } = useTheme()
+  const { t } = useLang()
+  const label: Record<ThemeMode, string> = {
+    light: t.themeLight,
+    dark: t.themeDark,
+    system: t.themeSystem,
+  }
 
   return (
     <div className="hidden items-center rounded-lg border border-line p-0.5 sm:flex" role="group" aria-label="Theme">
@@ -213,8 +223,8 @@ function ThemeSwitch({ mounted }: { mounted: boolean }) {
         <button
           key={entry.id}
           type="button"
-          title={entry.label}
-          aria-label={entry.label}
+          title={label[entry.id]}
+          aria-label={label[entry.id]}
           aria-pressed={mounted && mode === entry.id}
           onClick={() => setMode(entry.id)}
           className={`grid size-7 place-items-center rounded-md transition-colors ${
@@ -226,6 +236,40 @@ function ThemeSwitch({ mounted }: { mounted: boolean }) {
           <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             {entry.icon}
           </svg>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Two letters, not a globe.
+ *
+ * A globe icon asks you to guess; the name of the language you would be
+ * switching to does not. Rendered blank until mounted, like the theme switch —
+ * the current language comes from local storage.
+ */
+function LanguageSwitch({ mounted }: { mounted: boolean }) {
+  const { lang, setLang, t } = useLang()
+  const options: { id: Lang; label: string }[] = [
+    { id: 'en', label: 'EN' },
+    { id: 'th', label: 'ไทย' },
+  ]
+
+  return (
+    <div className="hidden items-center rounded-lg border border-line p-0.5 sm:flex" role="group" aria-label={t.language}>
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          lang={option.id}
+          aria-pressed={mounted && lang === option.id}
+          onClick={() => setLang(option.id)}
+          className={`grid h-7 min-w-8 place-items-center rounded-md px-1.5 text-xs font-bold transition-colors ${
+            mounted && lang === option.id ? 'bg-accent/12 text-accent' : 'text-muted hover:text-ink'
+          }`}
+        >
+          {option.label}
         </button>
       ))}
     </div>
@@ -303,35 +347,28 @@ export type Tool =
   | 'text'
   | 'frame'
 
-const TOOLS: { id: Tool; label: string; key: string; path: React.ReactNode }[] = [
-  { id: 'select', label: 'Select', key: 'V', path: <path d="M6 3l13 8-6 1.5L10 19 6 3Z" /> },
-  { id: 'pen', label: 'Pen', key: 'P', path: <path d="M4 20l4-1 10-10-3-3L5 16l-1 4ZM14 6l3 3" /> },
+const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
+  { id: 'select', key: 'V', path: <path d="M6 3l13 8-6 1.5L10 19 6 3Z" /> },
+  { id: 'pen', key: 'P', path: <path d="M4 20l4-1 10-10-3-3L5 16l-1 4ZM14 6l3 3" /> },
   {
     id: 'highlighter',
-    label: 'Highlighter',
     key: 'H',
     path: <path d="M5 19h5l9-9-4-4-9 9v4ZM3 21h8" />,
   },
-  { id: 'eraser', label: 'Eraser', key: 'E', path: <path d="M6 18h13M8 18l-4-4 8-8 6 6-6 6" /> },
-  { id: 'shape', label: 'Rectangle', key: 'R', path: <rect x="4" y="6" width="16" height="12" rx="2" /> },
+  { id: 'eraser', key: 'E', path: <path d="M6 18h13M8 18l-4-4 8-8 6 6-6 6" /> },
+  { id: 'shape', key: 'R', path: <rect x="4" y="6" width="16" height="12" rx="2" /> },
   {
     id: 'sticky',
-    label: 'Sticky note',
     key: 'N',
     path: <path d="M5 4h14v10l-5 6H5V4ZM19 14h-5v6" />,
   },
-  { id: 'text', label: 'Text', key: 'T', path: <path d="M5 6h14M12 6v13M9 19h6" /> },
-  { id: 'frame', label: 'Frame', key: 'F', path: <path d="M8 3v18M16 3v18M3 8h18M3 16h18" /> },
+  { id: 'text', key: 'T', path: <path d="M5 6h14M12 6v13M9 19h6" /> },
+  { id: 'frame', key: 'F', path: <path d="M8 3v18M16 3v18M3 8h18M3 16h18" /> },
 ]
 
 /** Pen widths, in board units. */
 const WIDTHS = [2, 4, 8, 14]
-const WEIGHTS: { value: number; label: string }[] = [
-  { value: 300, label: 'Light' },
-  { value: 500, label: 'Regular' },
-  { value: 700, label: 'Bold' },
-  { value: 900, label: 'Black' },
-]
+const WEIGHTS = [300, 500, 700, 900]
 
 export function ToolDock({
   tool,
@@ -355,8 +392,25 @@ export function ToolDock({
   /** Whether anything the type controls apply to is in play. */
   showType: boolean
 }) {
+  const { t } = useLang()
   const [palette, setPalette] = useState(false)
   const inking = tool === 'pen' || tool === 'highlighter'
+  const toolLabel: Record<Tool, string> = {
+    select: t.toolSelect,
+    pen: t.toolPen,
+    highlighter: t.toolHighlighter,
+    eraser: t.toolEraser,
+    shape: t.toolShape,
+    sticky: t.toolSticky,
+    text: t.toolText,
+    frame: t.toolFrame,
+  }
+  const weightLabel: Record<number, string> = {
+    300: t.weightLight,
+    500: t.weightRegular,
+    700: t.weightBold,
+    900: t.weightBlack,
+  }
 
   return (
     <div className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
@@ -390,7 +444,7 @@ export function ToolDock({
                 key={value}
                 type="button"
                 title={`${value}px`}
-                aria-label={`Pen width ${value}`}
+                aria-label={t.penWidth(value)}
                 aria-pressed={width === value}
                 onClick={() => onWidth(value)}
                 className={`grid size-8 place-items-center rounded-lg ${
@@ -404,18 +458,18 @@ export function ToolDock({
               </button>
             ))}
           {showType &&
-            WEIGHTS.map((entry) => (
+            WEIGHTS.map((value) => (
               <button
-                key={entry.value}
+                key={value}
                 type="button"
-                title={entry.label}
-                aria-label={entry.label}
-                aria-pressed={weight === entry.value}
-                onClick={() => onWeight(entry.value)}
+                title={weightLabel[value]}
+                aria-label={weightLabel[value]}
+                aria-pressed={weight === value}
+                onClick={() => onWeight(value)}
                 className={`grid h-8 min-w-9 place-items-center rounded-lg px-1.5 text-[15px] ${
-                  weight === entry.value ? 'bg-accent/12 text-accent' : 'text-ink hover:bg-canvas'
+                  weight === value ? 'bg-accent/12 text-accent' : 'text-ink hover:bg-canvas'
                 }`}
-                style={{ fontWeight: entry.value }}
+                style={{ fontWeight: value }}
               >
                 Aa
               </button>
@@ -428,8 +482,8 @@ export function ToolDock({
           <button
             key={entry.id}
             type="button"
-            title={`${entry.label} (${entry.key})`}
-            aria-label={entry.label}
+            title={`${toolLabel[entry.id]} (${entry.key})`}
+            aria-label={toolLabel[entry.id]}
             aria-pressed={tool === entry.id}
             onClick={() => onTool(entry.id)}
             className={`grid size-10 place-items-center rounded-xl transition-colors ${
@@ -454,8 +508,8 @@ export function ToolDock({
 
         <button
           type="button"
-          title="Colour"
-          aria-label="Colour"
+          title={t.colour}
+          aria-label={t.colour}
           aria-expanded={palette}
           onClick={() => setPalette((open) => !open)}
           className="grid size-10 place-items-center rounded-xl hover:bg-canvas"
@@ -513,6 +567,7 @@ export function MiniMap({
   camera: Camera
   viewport: { w: number; h: number }
 }) {
+  const { t } = useLang()
   const W = 190
   const H = 120
 
@@ -546,7 +601,7 @@ export function MiniMap({
 
   return (
     <div className="glass pointer-events-none absolute right-4 bottom-5 z-30 rounded-xl p-1.5">
-      <p className="px-1 pb-1 text-[10px] font-semibold tracking-wide text-muted uppercase">Map</p>
+      <p className="px-1 pb-1 text-[10px] font-semibold tracking-wide text-muted uppercase">{t.map}</p>
       <div className="relative overflow-hidden rounded-lg bg-canvas" style={{ width: W, height: H }}>
         {items.map((item) => (
           <span
@@ -648,6 +703,7 @@ export function LeftRail({
   selection: string[]
   mounted: boolean
 }) {
+  const { t } = useLang()
   const [open, setOpen] = useState<'people' | 'layers' | null>(null)
   const [closed, setClosed] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -660,7 +716,7 @@ export function LeftRail({
     <>
       <aside className="glass glass-flat pointer-events-auto absolute top-14 bottom-0 left-0 z-20 flex w-12 flex-col items-center gap-1 border-y-0 border-l-0 py-3">
         <RailButton
-          label="People"
+          label={t.people}
           count={people.length + 1}
           active={open === 'people'}
           onClick={() => setOpen((v) => (v === 'people' ? null : 'people'))}
@@ -668,7 +724,7 @@ export function LeftRail({
           <path d="M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
         </RailButton>
         <RailButton
-          label="Layers"
+          label={t.layers}
           count={items.length}
           active={open === 'layers'}
           onClick={() => setOpen((v) => (v === 'layers' ? null : 'layers'))}
@@ -680,7 +736,7 @@ export function LeftRail({
       {open && (
         <div className="glass pointer-events-auto absolute top-16 bottom-4 left-14 z-20 flex w-64 flex-col rounded-xl">
           <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold tracking-wide text-muted uppercase">
-            {open === 'people' ? 'In this room' : 'On the board'}
+            {open === 'people' ? t.inThisRoom : t.onTheBoard}
           </p>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
@@ -694,10 +750,10 @@ export function LeftRail({
                   <input
                     value={mounted ? me.name : ''}
                     onChange={(event) => onRename(event.target.value)}
-                    aria-label="Your name"
+                    aria-label={t.yourName}
                     className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-0.5 text-sm font-semibold outline-none hover:bg-panel/70 focus:bg-panel"
                   />
-                  <span className="text-[10px] font-semibold text-muted">you</span>
+                  <span className="text-[10px] font-semibold text-muted">{t.you}</span>
                 </li>
                 {mounted &&
                   people.map((peer, i) => (
@@ -709,7 +765,7 @@ export function LeftRail({
                         type="button"
                         onClick={() => onJumpTo(peer)}
                         disabled={!peer.cursor}
-                        title={peer.cursor ? `Jump to ${peer.name}` : `${peer.name} is not on the board`}
+                        title={peer.cursor ? t.jumpTo(peer.name) : t.notOnBoard(peer.name)}
                         className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left enabled:hover:bg-panel/70 disabled:opacity-60"
                       >
                         <Dot color={peer.color} initials={peer.initials} />
@@ -724,7 +780,7 @@ export function LeftRail({
                   ))}
               </ul>
             ) : rows.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-muted">Nothing on the board yet.</p>
+              <p className="px-2 py-3 text-sm text-muted">{t.nothingYet}</p>
             ) : (
               <ul className="space-y-0.5">
                 {rows.map((row) =>
@@ -753,7 +809,7 @@ export function LeftRail({
                         twisty={
                           <button
                             type="button"
-                            aria-label={closed.has(row.id) ? 'Expand' : 'Collapse'}
+                            aria-label={closed.has(row.id) ? t.expand : t.collapse}
                             onClick={(event) => {
                               event.stopPropagation()
                               setClosed((current) => {
@@ -841,6 +897,7 @@ function ItemRow({
   onFront: (ids: string[]) => void
   onBack: (ids: string[]) => void
 }) {
+  const { lang } = useLang()
   return (
     <Row
       icon={
@@ -852,8 +909,8 @@ function ItemRow({
           }}
         />
       }
-      label={item.name || item.text || kindName(item.kind)}
-      note={kindName(item.kind)}
+      label={item.name || item.text || kindName(item.kind, lang)}
+      note={kindName(item.kind, lang)}
       locked={item.locked}
       selected={selected}
       renaming={renaming}
@@ -909,6 +966,7 @@ function Row({
   onFront: () => void
   onBack: () => void
 }) {
+  const { t } = useLang()
   return (
     <div
       className={`group flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-sm ${
@@ -944,14 +1002,14 @@ function Row({
       )}
 
       <span className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <Tiny label="Bring to front" onClick={onFront}>
+        <Tiny label={t.bringToFront} onClick={onFront}>
           <path d="M12 4v12M7 9l5-5 5 5M5 20h14" />
         </Tiny>
-        <Tiny label="Send to back" onClick={onBack}>
+        <Tiny label={t.sendToBack} onClick={onBack}>
           <path d="M12 20V8M7 15l5 5 5-5M5 4h14" />
         </Tiny>
         {onLock && (
-          <Tiny label={locked ? 'Unlock' : 'Lock'} onClick={onLock} on={locked}>
+          <Tiny label={locked ? t.unlock : t.lock} onClick={onLock} on={locked}>
             <rect x="5" y="11" width="14" height="9" rx="2" />
             <path d={locked ? 'M8 11V8a4 4 0 0 1 8 0v3' : 'M8 11V8a4 4 0 0 1 7.7-1.5'} />
           </Tiny>
@@ -961,7 +1019,7 @@ function Row({
       {!renaming && note && (
         <span className="shrink-0 text-[10px] text-muted group-hover:hidden">{note}</span>
       )}
-      {locked && <span className="sr-only">locked</span>}
+      {locked && <span className="sr-only">{t.lock}</span>}
     </div>
   )
 }
@@ -995,8 +1053,17 @@ function Tiny({
   )
 }
 
-function kindName(kind: Item['kind']) {
-  return kind === 'sticky' ? 'note' : kind === 'shape' ? 'box' : kind
+function kindName(kind: Item['kind'], lang: Lang) {
+  const t = DICT[lang]
+  return kind === 'sticky'
+    ? t.kindSticky
+    : kind === 'shape'
+      ? t.kindShape
+      : kind === 'text'
+        ? t.kindText
+        : kind === 'frame'
+          ? t.kindFrame
+          : t.kindStroke
 }
 
 function Dot({ color, initials }: { color: string; initials: string }) {

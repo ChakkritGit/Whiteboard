@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import type { Item } from '@/lib/types'
 import { PALETTE } from '@/lib/palette'
+import { useLang } from '@/lib/i18n'
 
 /**
  * One thing on the board.
@@ -39,12 +40,13 @@ function Handles({
   onResize: (corner: Corner, event: React.PointerEvent) => void
   onRotate?: (event: React.PointerEvent) => void
 }) {
+  const { t } = useLang()
   return (
     <>
       {onRotate && (
         <span
           role="presentation"
-          title="Rotate"
+          title={t.rotate}
           onPointerDown={(event) => {
             event.stopPropagation()
             onRotate(event)

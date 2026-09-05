@@ -25,7 +25,8 @@ import {
   useTitle,
 } from '@/lib/board'
 import { saveMe, type Me } from '@/lib/identity'
-import { download, readFile } from '@/lib/io'
+import { useLang } from '@/lib/i18n'
+import { BadFile, download, readFile } from '@/lib/io'
 import { BoardItem, type Corner } from './board-item'
 import { ContextMenu, type MenuEntry } from './menu'
 import { Cursors, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
@@ -35,12 +36,18 @@ const MAX_ZOOM = 4
 const MIN_W = 40
 const MIN_H = 24
 
-/** What a new thing of each kind starts out as. */
-const DEFAULTS: Record<string, { w: number; h: number; text: string }> = {
-  sticky: { w: 168, h: 132, text: 'New note' },
-  text: { w: 220, h: 40, text: 'Text' },
-  shape: { w: 180, h: 120, text: '' },
-  frame: { w: 520, h: 380, text: 'Frame' },
+/**
+ * What a new thing of each kind starts out as.
+ *
+ * The placeholder text is in the language of whoever made it, not of whoever
+ * reads it — once typed it is board content, and content does not get
+ * retranslated under the person who wrote it.
+ */
+const SIZES: Record<string, { w: number; h: number }> = {
+  sticky: { w: 168, h: 132 },
+  text: { w: 220, h: 40 },
+  shape: { w: 180, h: 120 },
+  frame: { w: 520, h: 380 },
 }
 
 export function BoardApp({ room }: { room: string }) {
@@ -54,6 +61,7 @@ export function BoardApp({ room }: { room: string }) {
   const mounted = useMounted()
   const [title, setTitle] = useTitle(board)
   const history = useHistory(board)
+  const { lang, t } = useLang()
 
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 })
   const [tool, setTool] = useState<Tool>('select')
@@ -249,6 +257,19 @@ export function BoardApp({ room }: { room: string }) {
     (id: string, height: number) => updateItem(board, id, { h: height }),
     [board],
   )
+
+  /**
+   * Tell the document which language it is actually in.
+   *
+   * The board is served from the English root layout — it has no locale in its
+   * URL on purpose, because that URL gets shared — so the served `<html lang>`
+   * is `en` whatever the reader prefers. Nothing on the landing pages does this:
+   * there the layout is already right, and overwriting it from a stored
+   * preference would make an English page claim to be Thai.
+   */
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
 
   // A new name has to reach the room even if the pointer never moves again.
   useEffect(() => {
@@ -451,14 +472,16 @@ export function BoardApp({ room }: { room: string }) {
       return
     }
 
-    const spec = DEFAULTS[tool] ?? DEFAULTS.sticky
+    const spec = SIZES[tool] ?? SIZES.sticky
+    const placeholder =
+      tool === 'sticky' ? t.newNote : tool === 'text' ? t.newText : tool === 'frame' ? t.newFrame : ''
     const id = addItem(board, {
       kind: tool as Item['kind'],
       x: at.x - spec.w / 2,
       y: at.y - spec.h / 2,
       w: spec.w,
       h: spec.h,
-      text: spec.text,
+      text: placeholder,
       color: tool === 'text' ? ink : color,
       weight: tool === 'text' || tool === 'sticky' ? weight : undefined,
     })
@@ -762,16 +785,16 @@ export function BoardApp({ room }: { room: string }) {
 
     if (!some) {
       return [
-        { label: 'Paste', shortcut: `${mod}V`, disabled: clipboard.length === 0, onSelect: paste },
-        { label: 'Select all', shortcut: `${mod}A`, onSelect: () => setSelection(items.map((i) => i.id)) },
+        { label: t.paste, shortcut: `${mod}V`, disabled: clipboard.length === 0, onSelect: paste },
+        { label: t.selectAll, shortcut: `${mod}A`, onSelect: () => setSelection(items.map((i) => i.id)) },
         { kind: 'divider' },
-        { label: 'Fit to content', onSelect: fit },
+        { label: t.fitToContent, onSelect: fit },
       ]
     }
 
     return [
       {
-        label: 'Cut',
+        label: t.cut,
         shortcut: `${mod}X`,
         onSelect: () => {
           copy(chosen)
@@ -780,33 +803,33 @@ export function BoardApp({ room }: { room: string }) {
           setSelection([])
         },
       },
-      { label: 'Copy', shortcut: `${mod}C`, onSelect: () => copy(chosen) },
-      { label: 'Paste', shortcut: `${mod}V`, disabled: clipboard.length === 0, onSelect: paste },
-      { label: 'Duplicate', shortcut: `${mod}D`, onSelect: () => setSelection(duplicate(chosen)) },
+      { label: t.copy, shortcut: `${mod}C`, onSelect: () => copy(chosen) },
+      { label: t.paste, shortcut: `${mod}V`, disabled: clipboard.length === 0, onSelect: paste },
+      { label: t.duplicate, shortcut: `${mod}D`, onSelect: () => setSelection(duplicate(chosen)) },
       { kind: 'divider' },
-      { label: 'Bring to front', shortcut: ']', onSelect: () => bringToFront(board, chosen) },
-      { label: 'Send to back', shortcut: '[', onSelect: () => sendToBack(board, chosen) },
+      { label: t.bringToFront, shortcut: ']', onSelect: () => bringToFront(board, chosen) },
+      { label: t.sendToBack, shortcut: '[', onSelect: () => sendToBack(board, chosen) },
       { kind: 'divider' },
       {
-        label: allLocked ? 'Unlock' : 'Lock',
+        label: allLocked ? t.unlock : t.lock,
         onSelect: () => {
           chosen.forEach((id) => updateItem(board, id, { locked: !allLocked }))
           history.seal()
         },
       },
       {
-        label: 'Group',
+        label: t.group,
         shortcut: `${mod}G`,
         // Grouping one thing is a folder with one thing in it, which is only ever
         // in the way.
         disabled: chosen.length < 2,
         onSelect: () => {
-          groupItems(board, chosen, `Group ${Object.keys(groups).length + 1}`)
+          groupItems(board, chosen, t.groupName(Object.keys(groups).length + 1))
           history.seal()
         },
       },
       {
-        label: 'Ungroup',
+        label: t.ungroup,
         shortcut: `⇧${mod}G`,
         disabled: !group,
         onSelect: () => {
@@ -816,7 +839,7 @@ export function BoardApp({ room }: { room: string }) {
       },
       { kind: 'divider' },
       {
-        label: 'Delete',
+        label: t.del,
         shortcut: '⌫',
         danger: true,
         onSelect: () => {
@@ -826,7 +849,7 @@ export function BoardApp({ room }: { room: string }) {
         },
       },
     ]
-  }, [board, byId, clipboard, copy, duplicate, fit, groups, history, items, paste, selection])
+  }, [board, byId, clipboard, copy, duplicate, fit, groups, history, items, paste, selection, t])
 
   /* ------------------------------ keyboard ------------------------------ */
 
@@ -897,7 +920,7 @@ export function BoardApp({ room }: { room: string }) {
         if (event.shiftKey) {
           if (group) ungroup(board, group)
         } else if (selection.length > 1) {
-          groupItems(board, selection, `Group ${Object.keys(groups).length + 1}`)
+          groupItems(board, selection, t.groupName(Object.keys(groups).length + 1))
         }
         history.seal()
         return
@@ -957,7 +980,7 @@ export function BoardApp({ room }: { room: string }) {
       window.removeEventListener('keyup', onSpaceUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [board, byId, copy, duplicate, groups, history, items, paste, selection])
+  }, [board, byId, copy, duplicate, groups, history, items, paste, selection, t])
 
   /* -------------------------------- wheel -------------------------------- */
 
@@ -985,11 +1008,22 @@ export function BoardApp({ room }: { room: string }) {
       const { items: incoming, title: name, groups: folders } = await readFile(file)
       replaceAll(board, incoming, name, folders)
       setSelection([])
-      setToast(`Loaded ${incoming.length} items from ${file.name}`)
+      setToast(t.loaded(incoming.length, file.name))
       // Fitting after the state has come back round, so it measures the new board.
       setTimeout(fit, 60)
     } catch (error) {
-      setToast(error instanceof Error ? error.message : 'That file could not be read.')
+      if (error instanceof BadFile) {
+        const said = {
+          notJson: t.fileNotJson,
+          notOurs: t.fileNotOurs,
+          newer: t.fileNewer(error.detail ?? '?'),
+          noItems: t.fileNoItems,
+          damaged: t.fileDamaged,
+        }[error.code]
+        setToast(said)
+      } else {
+        setToast(t.unreadable)
+      }
     }
   }
 
@@ -1045,7 +1079,7 @@ export function BoardApp({ room }: { room: string }) {
         onFit={fit}
         history={history}
         onReset={() => setCamera({ x: 0, y: 0, zoom: 1 })}
-        onExport={() => download(items, title, groups)}
+        onExport={() => download(items, title || t.untitled, groups)}
         onImport={onImport}
         onShare={onShare}
         shared={shared}
