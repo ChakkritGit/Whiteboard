@@ -9,7 +9,7 @@ import { SITE } from '@/lib/site'
  * Thai one competes with the English one instead of serving Thai readers.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const languages = { en: SITE.url, th: `${SITE.url}/th` }
+  const languages = { th: SITE.url, en: `${SITE.url}/en` }
   const common = {
     lastModified: new Date(),
     changeFrequency: 'monthly' as const,
@@ -17,6 +17,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
   return [
     { url: SITE.url, priority: 1, ...common },
-    { url: `${SITE.url}/th`, priority: 0.9, ...common },
+    { url: `${SITE.url}/en`, priority: 0.9, ...common },
   ]
 }

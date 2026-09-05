@@ -21,7 +21,7 @@ const ICONS: React.ReactNode[] = [
 export function Landing({ lang }: { lang: Lang }) {
   const t = DICT[lang]
   const other = lang === 'th' ? 'en' : 'th'
-  const otherHref = lang === 'th' ? '/' : '/th'
+  const otherHref = lang === 'th' ? '/en' : '/'
 
   return (
     <>

@@ -12,7 +12,9 @@ import { SITE } from '@/lib/site'
  */
 export function siteMetadata(lang: Lang): Metadata {
   const t = DICT[lang]
-  const path = lang === 'th' ? '/th' : '/'
+  // Thai is the default language, so Thai owns the bare path and English is the
+  // one with a prefix. Anything that builds a URL reads it from here.
+  const path = lang === 'th' ? '/' : '/en'
   const title = `${SITE.name} — ${t.tagline}`
 
   return {
@@ -28,7 +30,7 @@ export function siteMetadata(lang: Lang): Metadata {
     creator: 'Chakkrit',
     alternates: {
       canonical: path,
-      languages: { en: '/', th: '/th', 'x-default': '/' },
+      languages: { th: '/', en: '/en', 'x-default': '/' },
     },
     openGraph: {
       type: 'website',
