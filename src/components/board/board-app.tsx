@@ -274,6 +274,7 @@ export function BoardApp({ room }: { room: string }) {
   // A new name has to reach the room even if the pointer never moves again.
   useEffect(() => {
     board.awareness()?.setLocalStateField('user', {
+      id: me.id,
       name: me.name,
       initials: me.initials,
       color: me.color,
@@ -494,6 +495,7 @@ export function BoardApp({ room }: { room: string }) {
   const onSurfaceMove = (event: React.PointerEvent) => {
     const at = toWorld(event.clientX, event.clientY)
     board.awareness()?.setLocalStateField('user', {
+      id: me.id,
       name: me.name,
       initials: me.initials,
       color: me.color,

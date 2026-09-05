@@ -56,6 +56,8 @@ export type Camera = { x: number; y: number; zoom: number }
 
 /** What one person's presence looks like to everyone else. */
 export type Presence = {
+  /** Which browser this is; see `Me`. */
+  id: string
   name: string
   initials: string
   color: string

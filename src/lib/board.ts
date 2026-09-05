@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import { IndexeddbPersistence } from 'y-indexeddb'
+import * as awarenessProtocol from 'y-protocols/awareness'
 import { nanoid } from 'nanoid'
 import type { Item, Presence } from './types'
 import { loadMe } from './identity'
@@ -65,6 +66,7 @@ export function useBoard(room: string): BoardHandle {
 
     const me = loadMe()
     ws.awareness.setLocalStateField('user', {
+      id: me.id,
       name: me.name,
       initials: me.initials,
       color: me.color,
@@ -77,7 +79,21 @@ export function useBoard(room: string): BoardHandle {
     ws.awareness.on('change', notify)
     notify()
 
+    /**
+     * Say goodbye on the way out, before the socket dies.
+     *
+     * y-websocket does this on `beforeunload`, which a phone browser may never
+     * fire — it puts pages into the back/forward cache instead and sends
+     * `pagehide`. Without one of the two the room only finds out when the socket
+     * closes, and until then the person who just left is still standing there.
+     */
+    const leave = () => {
+      awarenessProtocol.removeAwarenessStates(ws.awareness, [doc.clientID], 'pagehide')
+    }
+    window.addEventListener('pagehide', leave)
+
     return () => {
+      window.removeEventListener('pagehide', leave)
       ws.off('status', notify)
       ws.awareness.off('change', notify)
       ws.destroy()
@@ -316,11 +332,40 @@ export function usePeers(handle: BoardHandle): Presence[] {
 
   const read = () => {
     const awareness = handle.awareness()
+    const mine = loadMe().id
     const next: Presence[] = []
+
+    // The freshest announcement anybody has made, rather than the wall clock.
+    // This is read inside a `useSyncExternalStore` snapshot, and a snapshot that
+    // consults a clock can answer differently twice in the same render — which
+    // React treats as an unstable store and re-renders forever. Awareness
+    // timestamps are data, and every live client refreshes its own every fifteen
+    // seconds, so the newest of them advances just as well.
+    let newest = 0
+    awareness?.getStates().forEach((_state, clientId) => {
+      const meta = awareness.meta.get(clientId)
+      if (meta) newest = Math.max(newest, meta.lastUpdated)
+    })
+
     awareness?.getStates().forEach((state, clientId) => {
       if (clientId === awareness.clientID) return
       const user = (state as { user?: Presence }).user
-      if (user) next.push(user)
+      if (!user) return
+
+      // You are never two people. A refresh mints a new Yjs client id, so for a
+      // moment the room holds the tab that just left as well as the one that
+      // just arrived — a ghost of yourself, standing where you were. Same
+      // browser, same id, not a second person.
+      if (user.id && user.id === mine) return
+
+      // Nor is somebody whose presence has gone quiet. Awareness re-announces
+      // itself every fifteen seconds, so anything twenty behind the newest has
+      // stopped announcing; y-protocols sweeps those at thirty, and thirty
+      // seconds of somebody who has already gone is what this shortens.
+      const meta = awareness.meta.get(clientId)
+      if (meta && newest - meta.lastUpdated > 20_000) return
+
+      next.push(user)
     })
     // Same reason as `useItems`: a fresh array every read would look like a
     // change on every render.
