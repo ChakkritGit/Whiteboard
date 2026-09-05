@@ -1,5 +1,7 @@
 'use client'
 
+import { jpegToPdf } from './pdf'
+import { toCanvas, type PictureFormat } from './picture'
 import type { BoardFile, Item } from './types'
 
 /**
@@ -26,14 +28,69 @@ export function download(items: Item[], title: string, groups?: Record<string, s
   const blob = new Blob([JSON.stringify(toFile(items, title, groups), null, 2)], {
     type: 'application/json',
   })
+  save(blob, `${slug(title)}.whiteboard.json`)
+}
+
+function save(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${slug(title)}.whiteboard.json`
+  link.download = filename
   link.click()
   // Revoking on the next tick rather than immediately: Safari has not finished
   // with the URL when `click()` returns.
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function encode(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('encode failed'))),
+      type,
+      quality,
+    )
+  })
+}
+
+/**
+ * The board as a picture: the whole of it, not the part that happens to be on
+ * screen, and at twice the resolution so it holds up when someone zooms in.
+ *
+ * The PDF goes through the same JPEG as the JPEG export — a PDF can carry those
+ * bytes as they are, so the page is a wrapper round a picture that has already
+ * been made rather than a second rendering of the board.
+ */
+export async function downloadPicture(items: Item[], title: string, format: PictureFormat) {
+  if (!items.length) throw new EmptyBoard()
+
+  const { canvas, scale } = toCanvas(items, 2)
+
+  if (format === 'png') {
+    save(await encode(canvas, 'image/png'), `${slug(title)}.png`)
+    return
+  }
+
+  const jpeg = await encode(canvas, 'image/jpeg', 0.92)
+  if (format === 'jpeg') {
+    save(jpeg, `${slug(title)}.jpg`)
+    return
+  }
+
+  const bytes = new Uint8Array(await jpeg.arrayBuffer())
+  // The page is the board at its own size: the picture is twice as many pixels,
+  // so the points-per-pixel halves with it.
+  save(
+    jpegToPdf(bytes, canvas.width, canvas.height, 0.75 / scale),
+    `${slug(title)}.pdf`,
+  )
+}
+
+/** There is nothing to draw. Named, so the caller can say it in the right language. */
+export class EmptyBoard extends Error {
+  constructor() {
+    super('emptyBoard')
+    this.name = 'EmptyBoard'
+  }
 }
 
 /**

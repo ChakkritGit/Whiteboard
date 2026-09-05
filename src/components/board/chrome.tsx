@@ -12,6 +12,10 @@ import { Logo } from './logo'
 
 /* --------------------------------- top --------------------------------- */
 
+/** What the export button can produce; `json` is the board itself, the rest are
+ *  pictures of it. */
+export type ExportFormat = 'json' | 'png' | 'jpeg' | 'pdf'
+
 export function TopBar({
   title,
   onTitle,
@@ -39,7 +43,7 @@ export function TopBar({
   onFit: () => void
   onReset: () => void
   history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void }
-  onExport: () => void
+  onExport: (format: ExportFormat) => void
   onImport: (file: File) => void
   onShare: () => void
   shared: boolean
@@ -48,6 +52,7 @@ export function TopBar({
 }) {
   const { t } = useLang()
   const file = useRef<HTMLInputElement>(null)
+  const [exporting, setExporting] = useState(false)
   const everyone = [{ initials: me.initials, color: me.color, name: me.name }, ...peers]
   const shown = everyone.slice(0, 4)
 
@@ -153,9 +158,43 @@ export function TopBar({
           {t.fit}
         </button>
 
-        <IconButton label={t.exportBoard} onClick={onExport}>
-          <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
-        </IconButton>
+        {/* Four things to export rather than one, so the button opens rather
+            than acts. The menu closes on losing focus, which covers clicking
+            away and tabbing away in the one handler. */}
+        <div
+          className="relative"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) setExporting(false)
+          }}
+        >
+          <IconButton label={t.exportBoard} onClick={() => setExporting((open) => !open)}>
+            <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
+          </IconButton>
+          {exporting && (
+            <div className="glass absolute top-full right-0 z-40 mt-1.5 w-40 rounded-xl p-1">
+              {(
+                [
+                  ['json', t.exportJson],
+                  ['png', 'PNG'],
+                  ['jpeg', 'JPEG'],
+                  ['pdf', 'PDF'],
+                ] as const
+              ).map(([format, label]) => (
+                <button
+                  key={format}
+                  type="button"
+                  onClick={() => {
+                    setExporting(false)
+                    onExport(format)
+                  }}
+                  className="block w-full rounded-lg px-3 py-1.5 text-left text-sm hover:bg-ink/10"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <IconButton label={t.importBoard} onClick={() => file.current?.click()}>
           <path d="M12 20V9M8 13l4-4 4 4M5 4h14" />

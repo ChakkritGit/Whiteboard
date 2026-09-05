@@ -26,10 +26,19 @@ import {
 } from '@/lib/board'
 import { saveMe, type Me } from '@/lib/identity'
 import { useLang } from '@/lib/i18n'
-import { BadFile, download, readFile } from '@/lib/io'
+import { BadFile, EmptyBoard, download, downloadPicture, readFile } from '@/lib/io'
 import { BoardItem, type Corner } from './board-item'
 import { ContextMenu, type MenuEntry } from './menu'
-import { Cursors, LeftRail, MiniMap, Toast, ToolDock, TopBar, type Tool } from './chrome'
+import {
+  Cursors,
+  LeftRail,
+  MiniMap,
+  Toast,
+  ToolDock,
+  TopBar,
+  type ExportFormat,
+  type Tool,
+} from './chrome'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
@@ -1005,6 +1014,27 @@ export function BoardApp({ room }: { room: string }) {
 
   /* ------------------------------ the file ------------------------------ */
 
+  /**
+   * Export, in whichever of the four shapes was asked for.
+   *
+   * The picture is drawn from the items rather than captured from the screen,
+   * so it takes a moment on a large board and can fail on one large enough to
+   * exhaust the canvas — hence the await and the message, where the JSON path
+   * needs neither.
+   */
+  const onExport = async (format: ExportFormat) => {
+    const name = title || t.untitled
+    if (format === 'json') {
+      download(items, name, groups)
+      return
+    }
+    try {
+      await downloadPicture(items, name, format)
+    } catch (error) {
+      setToast(error instanceof EmptyBoard ? t.exportEmpty : t.exportFailed)
+    }
+  }
+
   const onImport = async (file: File) => {
     try {
       const { items: incoming, title: name, groups: folders } = await readFile(file)
@@ -1081,7 +1111,7 @@ export function BoardApp({ room }: { room: string }) {
         onFit={fit}
         history={history}
         onReset={() => setCamera({ x: 0, y: 0, zoom: 1 })}
-        onExport={() => download(items, title || t.untitled, groups)}
+        onExport={onExport}
         onImport={onImport}
         onShare={onShare}
         shared={shared}
