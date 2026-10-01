@@ -511,30 +511,6 @@ export function ToolDock({
 
   return (
     <div className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
-      {flyout && (
-        <div className="glass mb-2 flex w-fit items-center gap-1 rounded-xl p-1.5">
-          {TOOLS.filter((entry) => SHAPES.includes(entry.id)).map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              title={`${toolLabel[entry.id]} (${entry.key})`}
-              // Not the dock button's own label, or two buttons answer to one name.
-              aria-label={t.shapeOption(toolLabel[entry.id])}
-              aria-pressed={tool === entry.id}
-              onClick={() => {
-                setFlyout(false)
-                onTool(entry.id)
-              }}
-              className={`grid size-9 place-items-center rounded-lg ${tool === entry.id ? 'bg-accent/12' : 'hover:bg-canvas'}`}
-            >
-              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                {entry.path}
-              </svg>
-            </button>
-          ))}
-        </div>
-      )}
-
       {templates && (
         <div className="glass mb-2 w-fit rounded-xl p-2">
           <div className="mb-2 flex gap-1" role="group" aria-label={t.templates}>
@@ -679,18 +655,44 @@ export function ToolDock({
                 </svg>
               </button>
               {base.id === 'shape' && (
-                <button
-                  type="button"
-                  title={t.moreShapes}
-                  aria-label={t.moreShapes}
-                  aria-expanded={flyout}
-                  onClick={() => setFlyout((open) => !open)}
-                  className="-ml-0.5 grid h-10 w-4 place-items-center rounded-lg text-muted hover:bg-canvas"
-                >
-                  <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 15l6-6 6 6" />
-                  </svg>
-                </button>
+                <span className="relative flex">
+                  {flyout && (
+                    // Over its own button, not at the dock's left edge.
+                    <div className="glass absolute bottom-full left-1/2 mb-4 flex -translate-x-1/2 items-center gap-1 rounded-xl p-1.5">
+                      {TOOLS.filter((entry) => SHAPES.includes(entry.id)).map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          title={`${toolLabel[entry.id]} (${entry.key})`}
+                          // Not the dock button's own label, or two buttons answer to one name.
+                          aria-label={t.shapeOption(toolLabel[entry.id])}
+                          aria-pressed={tool === entry.id}
+                          onClick={() => {
+                            setFlyout(false)
+                            onTool(entry.id)
+                          }}
+                          className={`grid size-9 place-items-center rounded-lg ${tool === entry.id ? 'bg-accent/12' : 'hover:bg-canvas'}`}
+                        >
+                          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                            {entry.path}
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    title={t.moreShapes}
+                    aria-label={t.moreShapes}
+                    aria-expanded={flyout}
+                    onClick={() => setFlyout((open) => !open)}
+                    className="-ml-0.5 grid h-10 w-4 place-items-center rounded-lg text-muted hover:bg-canvas"
+                  >
+                    <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 15l6-6 6 6" />
+                    </svg>
+                  </button>
+                </span>
               )}
             </Fragment>
           )

@@ -16,7 +16,9 @@ export type GlobeState = 'idle' | 'thinking' | 'done'
  * A static SVG with CSS-only states; the keyframes live in `globals.css`.
  */
 export function Globe({ state }: { state: GlobeState }) {
-  const ink = 'var(--color-ink)'
+  // Printed ink, the same in both themes: the theme's ink is cream in dark mode,
+  // and cream pupils on white eyes disappear.
+  const ink = '#1B1B3A'
   return (
     <span className="gl block" data-state={state}>
       <svg viewBox="0 0 56 56" width="56" height="56" aria-hidden="true">
