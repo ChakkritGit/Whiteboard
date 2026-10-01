@@ -1,5 +1,5 @@
 import type { Item, Swatch } from './types'
-import type { Draft } from './templates'
+import type { Draft, FlowEdge, FlowNode } from './templates'
 
 /**
  * Mr. Worldwide's side of the wire, as plain functions.
@@ -14,6 +14,7 @@ export type DigestItem = { id: string; kind: string; text: string; x: number; y:
 export type Plan =
   | { type: 'kanban'; title: string; columns: { title: string; cards: string[] }[] }
   | { type: 'timeline'; title: string; milestones: { title: string; note?: string }[] }
+  | { type: 'flowchart'; title: string; nodes: FlowNode[]; edges: FlowEdge[] }
 export type Group = { title: string; ids: string[] }
 type Body = { mode: Mode; lang: 'th' | 'en'; request: string; board: { items: DigestItem[] } }
 export type ErrorCode = 'quota' | 'rate_limited' | 'unparseable' | 'upstream' | 'bad_request' | 'forbidden' | 'offline'

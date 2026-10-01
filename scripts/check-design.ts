@@ -85,7 +85,7 @@ assert.equal(
 )
 console.log('image rules ok')
 
-const { TEMPLATES, layoutKanban, layoutTimeline, resolveRefs } = await import('../src/lib/templates.ts')
+const { TEMPLATES, layoutKanban, layoutTimeline, layoutFlowchart, resolveRefs } = await import('../src/lib/templates.ts')
 const { DICT } = await import('../src/lib/dictionary.ts')
 const finite = (n: unknown) => typeof n === 'number' && Number.isFinite(n)
 for (const lang of ['en', 'th'] as const) {
@@ -203,3 +203,45 @@ assert.deepEqual(
 )
 assert.deepEqual(tidyLayout([{ title: 'x', ids: ['in', 'gone'] }], byId(framed)), { frames: [], moves: [] })
 console.log('tidy ok')
+
+/* flowchart */
+type FN = import('../src/lib/templates.ts').FlowNode
+type FE = import('../src/lib/templates.ts').FlowEdge
+const fn = (id: string, shape: FN['shape'] = 'process'): FN => ({ id, label: id, shape })
+const boxes = (rows: ReturnType<typeof resolveRefs>) => rows.filter((r) => r.kind === 'shape')
+const noOverlap = (rows: ReturnType<typeof resolveRefs>, msg: string) => {
+  for (const a of rows) for (const b of rows) if (a !== b) assert.ok(!(a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y), msg)
+}
+const flowRows = (n: FN[], e: FE[]) => {
+  let i = 0
+  return resolveRefs(layoutFlowchart(en, { x: 0, y: 0 }, 'f', n, e), () => `f${i++}`)
+}
+const retryNodes = [fn('s', 'start'), fn('a'), fn('b'), fn('d', 'decision'), fn('c'), fn('e', 'end')]
+const retryEdges: FE[] = [
+  { from: 's', to: 'a' }, { from: 'a', to: 'b' }, { from: 'b', to: 'd' },
+  { from: 'd', to: 'c', label: 'yes' }, { from: 'd', to: 'b', label: 'retry' }, { from: 'c', to: 'e' },
+]
+const retry = flowRows(retryNodes, retryEdges)
+for (const r of retry) for (const v of [r.x, r.y, r.w, r.h, ...(r.points ?? [])]) assert.ok(finite(v), 'flowchart number')
+assert.equal(boxes(retry).length, 6)
+noOverlap(boxes(retry), 'flowchart nodes overlap')
+const rids = new Set(retry.map((r) => r.id))
+for (const r of retry.filter((r) => r.kind === 'connector')) assert.ok(rids.has(r.from!) && rids.has(r.to!), 'flowchart connector dangles')
+assert.equal(retry.filter((r) => r.kind === 'connector').length, 6)
+assert.equal(retry.filter((r) => r.kind === 'text').length, 2)
+const rowY = (rows: ReturnType<typeof resolveRefs>, text: string) => rows.find((r) => r.kind === 'shape' && r.text === text)!.y
+assert.ok(rowY(retry, 'a') < rowY(retry, 'b') && rowY(retry, 'b') < rowY(retry, 'd') && rowY(retry, 'd') < rowY(retry, 'c'), 'a back edge pushed a node out of order')
+const cyc = flowRows([fn('x'), fn('y'), fn('z')], [{ from: 'x', to: 'y' }, { from: 'y', to: 'z' }, { from: 'z', to: 'x' }])
+assert.equal(boxes(cyc).length, 3, 'a pure cycle places every node')
+noOverlap(boxes(cyc), 'cycle nodes overlap')
+const lone = flowRows([fn('s', 'start'), fn('a'), fn('o')], [{ from: 's', to: 'a' }])
+assert.ok(rowY(lone, 'o') > rowY(lone, 'a'), 'an unconnected node is not below the rest')
+const wide = flowRows(
+  [fn('d', 'decision'), fn('1'), fn('2'), fn('3'), fn('4')],
+  ['1', '2', '3', '4'].map((to) => ({ from: 'd', to })),
+)
+assert.equal(new Set(['1', '2', '3', '4'].map((t) => rowY(wide, t))).size, 1, 'children share a row')
+assert.ok(rowY(wide, '1') > rowY(wide, 'd'))
+noOverlap(boxes(wide), 'wide row overlaps')
+assert.deepEqual(layoutFlowchart(en, { x: 0, y: 0 }, 'f', [], []), [])
+console.log('flowchart ok')

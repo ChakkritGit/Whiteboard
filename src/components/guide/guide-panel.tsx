@@ -5,7 +5,7 @@ import type { BoardHandle, useHistory } from '@/lib/board'
 import { applyTidy, placeTemplate } from '@/lib/board'
 import type { Camera, Item } from '@/lib/types'
 import { useLang } from '@/lib/i18n'
-import { layoutKanban, layoutTimeline } from '@/lib/templates'
+import { layoutFlowchart, layoutKanban, layoutTimeline } from '@/lib/templates'
 import { askGuide, buildDigest, streamGuide, tidyLayout, type ErrorCode, type Group, type Mode } from '@/lib/guide'
 import type { GlobeState } from './globe'
 
@@ -104,18 +104,29 @@ export default function GuidePanel({
           say('guide', error(answer.code))
         } else if (answer.kind === 'plan') {
           const plan = answer.plan
-          const drafts =
-            plan.type === 'kanban'
-              ? layoutKanban(words, centre, plan.title, plan.columns)
-              : layoutTimeline(words, centre, plan.title, plan.milestones)
           const title = plan.title || t.untitled
+          // An unknown type from a newer server has no layout: it falls through to the empty line.
+          const drafts =
+            plan.type === 'kanban' && Array.isArray(plan.columns)
+              ? layoutKanban(words, centre, plan.title, plan.columns)
+              : plan.type === 'timeline' && Array.isArray(plan.milestones)
+                ? layoutTimeline(words, centre, plan.title, plan.milestones)
+                : plan.type === 'flowchart' && Array.isArray(plan.nodes) && Array.isArray(plan.edges)
+                  ? layoutFlowchart(words, centre, plan.title, plan.nodes, plan.edges)
+                  : []
           history.seal()
           const ids = drafts.length ? placeTemplate(board, drafts, title) : []
           history.seal()
           if (ids.length) {
             select(ids)
-            const n = plan.type === 'kanban' ? plan.columns.length : plan.milestones.length
-            say('guide', plan.type === 'kanban' ? t.guidePlanKanban(title, n) : t.guidePlanTimeline(title, n))
+            say(
+              'guide',
+              plan.type === 'kanban'
+                ? t.guidePlanKanban(title, plan.columns.length)
+                : plan.type === 'timeline'
+                  ? t.guidePlanTimeline(title, plan.milestones.length)
+                  : t.guidePlanFlow(title, plan.nodes.length),
+            )
           } else {
             ok = false
             say('guide', t.guidePlanEmpty)

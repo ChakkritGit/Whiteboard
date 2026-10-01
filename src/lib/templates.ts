@@ -120,6 +120,93 @@ export function layoutTimeline(
   return centred(out, origin)
 }
 
+export type FlowNode = { id: string; label: string; shape: 'start' | 'process' | 'decision' | 'end' }
+export type FlowEdge = { from: string; to: string; label?: string }
+
+const FLOW_LOOK: Record<FlowNode['shape'], { w: number; h: number; color: Swatch; shape: 'rect' | 'ellipse' | 'diamond' }> = {
+  start: { w: 200, h: 90, color: 'green', shape: 'ellipse' },
+  end: { w: 200, h: 90, color: 'magenta', shape: 'ellipse' },
+  process: { w: 220, h: 100, color: 'sky', shape: 'rect' },
+  decision: { w: 200, h: 150, color: 'amber', shape: 'diamond' },
+}
+
+/**
+ * A flowchart, top-down by longest path.
+ *
+ * Back edges (a retry that loops up) are found with a depth-first walk and left
+ * out of the layering, so a cycle neither hangs nor drags its nodes down a row
+ * per lap. Whatever the walk never reaches, an unconnected node included, goes
+ * in a row of its own at the bottom. Edges naming a missing node, and repeated
+ * ids, are dropped rather than trusted.
+ */
+export function layoutFlowchart(w: Words, origin: Point, title: string, nodes: FlowNode[], edges: FlowEdge[]): Draft[] {
+  void w
+  void title
+  const seen = new Set<string>()
+  const list = nodes.filter((n) => FLOW_LOOK[n.shape] && !seen.has(n.id) && seen.add(n.id))
+  if (!list.length) return []
+  const valid = edges.filter((e) => seen.has(e.from) && seen.has(e.to) && e.from !== e.to)
+  const outgoing = new Map<string, FlowEdge[]>(list.map((n) => [n.id, []]))
+  for (const e of valid) outgoing.get(e.from)?.push(e)
+  const hasIn = new Set(valid.map((e) => e.to))
+  const hasOut = new Set(valid.map((e) => e.from))
+  let roots = list.filter((n) => !hasIn.has(n.id) && hasOut.has(n.id))
+  if (!roots.length) roots = [list.find((n) => n.shape === 'start') ?? list[0]]
+
+  const state = new Map<string, 'open' | 'done'>()
+  const back = new Set<FlowEdge>()
+  const walk = (id: string) => {
+    state.set(id, 'open')
+    for (const e of outgoing.get(id) ?? []) {
+      const s = state.get(e.to)
+      if (s === 'open') back.add(e)
+      else if (!s) walk(e.to)
+    }
+    state.set(id, 'done')
+  }
+  for (const r of roots) if (!state.has(r.id)) walk(r.id)
+
+  const depth = new Map<string, number>(list.filter((n) => state.has(n.id)).map((n) => [n.id, 0]))
+  for (let pass = 0; pass < list.length; pass++) {
+    for (const e of valid) {
+      if (back.has(e) || !depth.has(e.from)) continue
+      depth.set(e.to, Math.max(depth.get(e.to) ?? 0, depth.get(e.from)! + 1))
+    }
+  }
+  const last = Math.max(0, ...depth.values()) + (depth.size < list.length ? 1 : 0)
+  const rows: FlowNode[][] = Array.from({ length: last + 1 }, () => [])
+  for (const n of list) rows[depth.get(n.id) ?? last].push(n)
+
+  const drafts: Draft[] = []
+  const centre = new Map<string, Point>()
+  rows.forEach((row, d) => {
+    let x = -(row.reduce((sum, n) => sum + FLOW_LOOK[n.shape].w, 0) + 60 * (row.length - 1)) / 2
+    for (const n of row) {
+      const look = FLOW_LOOK[n.shape]
+      drafts.push(...node(n.id, x, d * 200 - look.h / 2, look.w, look.h, n.label, look.color, look.shape))
+      centre.set(n.id, { x: x + look.w / 2, y: d * 200 })
+      x += look.w + 60
+    }
+  })
+  for (const e of valid) {
+    const a = centre.get(e.from)!
+    const b = centre.get(e.to)!
+    drafts.push({
+      ...link(e.from, e.to),
+      x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.max(1, Math.abs(b.x - a.x)), h: Math.max(1, Math.abs(b.y - a.y)),
+      points: [a.x, a.y, b.x, b.y],
+    })
+    if (e.label?.trim()) {
+      // A text box hugs its words once drawn, and that write is one more undo step, so the
+      // height is what one line measures (31) and the width has room for the label: a label
+      // that wraps is rewritten by the board, and Cmd+Z then undoes the rewrite forever.
+      const lw = Math.max(80, e.label.length * 10 + 16)
+      drafts.push({ kind: 'text', x: (a.x + b.x) / 2 + 12, y: (a.y + b.y) / 2 - 15, w: lw, h: 31, text: e.label, color: 'slate', weight: 600 })
+    }
+  }
+  return centred(drafts, origin)
+}
+
 function retro(w: Words, origin: Point) {
   const cols: [string, Swatch][] = [[w.tplWentWell, 'green'], [w.tplImprove, 'amber'], [w.tplActions, 'pink']]
   const out: Draft[] = []
