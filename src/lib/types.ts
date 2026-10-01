@@ -1,6 +1,6 @@
 /** Everything a board is made of. */
 
-export type ItemKind = 'sticky' | 'frame' | 'text' | 'shape' | 'comment' | 'stroke'
+export type ItemKind = 'sticky' | 'frame' | 'text' | 'shape' | 'comment' | 'stroke' | 'connector' | 'image'
 
 /** The one colour name a sticky, shape or frame carries; see `PALETTE`. */
 export type Swatch =
@@ -33,8 +33,25 @@ export type Item = {
   author?: string
   /** A freehand stroke's path, as flat world-space pairs. Flat rather than
    *  `{x, y}` objects because this is the one field that gets long, and it
-   *  crosses the wire on every pointer move while somebody is drawing. */
+   *  crosses the wire on every pointer move while somebody is drawing.
+   *  A connector uses it as `[x1, y1, x2, y2]`: the stored ends, used when an end
+   *  is free or the item it was bound to is gone. */
   points?: number[]
+  /** Pen pressure, parallel to `points` (one 0..1 value per pair). Absent for
+   *  strokes made before pressure was kept, or with a mouse or finger. */
+  pressure?: number[]
+  /** What outline a shape has. Missing means a rectangle. */
+  shape?: 'rect' | 'ellipse' | 'diamond'
+  /** A picture's key in the image store, never a URL: see `IMG_BASE`. */
+  src?: string
+  /** A picture's width over its height, as uploaded; resizing keeps it. */
+  aspect?: number
+  /** The item id a connector's start is bound to. */
+  from?: string
+  /** The item id a connector's end is bound to. */
+  to?: string
+  /** Whether a connector ends in an arrowhead. Missing means none. */
+  head?: 'end' | 'none'
   /** How wide the pen was, and whether it was the translucent one. */
   stroke?: number
   highlight?: boolean

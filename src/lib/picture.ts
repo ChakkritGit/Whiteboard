@@ -1,6 +1,11 @@
 'use client'
 
 import { PALETTE } from './palette'
+import { IMG_BASE } from './board'
+import { KEY_RE } from './image-rules'
+import { connectorEnds } from './geometry'
+import { inkPath } from './ink'
+import { FRAME_DASH, SKETCH, linePaths, seedOf, shapePaths, type SketchKind } from './sketch'
 import type { Item } from './types'
 
 /**
@@ -22,13 +27,15 @@ import type { Item } from './types'
 export type PictureFormat = 'png' | 'jpeg' | 'pdf'
 
 /** The light theme, always: an exported picture is a document, not a screenshot. */
-const CANVAS = '#f4f2ee'
-const INK = '#1f2430'
-const LINE = '#e5e3df'
-const PANEL = '#ffffff'
+const CANVAS = '#f7f1e3'
+const INK = '#1b1b3a'
+const PANEL = '#fffdf7'
 
-const FONT =
-  "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans Thai', sans-serif"
+/** Read per picture, not at load: the hand font's family name is only known once Next has set it. */
+const font = () => {
+  const hand = getComputedStyle(document.documentElement).getPropertyValue('--font-hand').trim()
+  return `${hand ? hand + ', ' : ''}ui-sans-serif, system-ui, 'Noto Sans Thai', sans-serif`
+}
 
 /** Matching `board-item.tsx`: sticky `p-3`, text `p-1`, both 15px on 1.375. */
 const STICKY_PAD = 12
@@ -36,8 +43,6 @@ const TEXT_PAD = 4
 const BODY_SIZE = 15
 const NOTE_SIZE = 13
 const LINE_HEIGHT = 1.375
-const RADIUS = 8
-const FRAME_RADIUS = 12
 
 /** Space left round the outside, in board units. */
 const MARGIN = 48
@@ -80,6 +85,35 @@ function roundedRect(ctx: CanvasRenderingContext2D, w: number, h: number, r: num
   ctx.arcTo(0, h, 0, 0, radius)
   ctx.arcTo(0, 0, w, 0, radius)
   ctx.closePath()
+}
+
+/**
+ * The same hand-drawn box the board draws, from the same `d` strings: the fill
+ * `SKETCH.offset` off the outline, then the outline on top.
+ */
+function sketch(
+  ctx: CanvasRenderingContext2D,
+  item: Item,
+  kind: SketchKind,
+  line: string,
+  fill?: string,
+  solid = false,
+) {
+  const shape = item.shape === 'ellipse' || item.shape === 'diamond' ? item.shape : 'rect'
+  const paths = shapePaths(item.w, item.h, seedOf(item.id), kind, line, fill, shape)
+  if (paths.fill && fill) {
+    ctx.save()
+    ctx.translate(SKETCH.offset, SKETCH.offset)
+    ctx.fillStyle = fill
+    ctx.fill(new Path2D(paths.fill))
+    ctx.restore()
+  }
+  ctx.strokeStyle = line
+  ctx.lineWidth = SKETCH.strokeWidth
+  ctx.lineCap = 'round'
+  if (kind === 'frame' && !solid) ctx.setLineDash(FRAME_DASH)
+  ctx.stroke(new Path2D(paths.outline))
+  ctx.setLineDash([])
 }
 
 /**
@@ -136,7 +170,7 @@ function drawText(
   weight: number,
   colour: string,
 ) {
-  ctx.font = `${weight} ${size}px ${FONT}`
+  ctx.font = `${weight} ${size}px ${font()}`
   ctx.fillStyle = colour
   ctx.textBaseline = 'top'
   const step = size * LINE_HEIGHT
@@ -144,7 +178,33 @@ function drawText(
   return wrap(ctx, text, width).length * step
 }
 
-function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
+/** What the board shows for a picture that will not load: ink hatching and a small picture mark. */
+function drawMissing(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.save()
+  ctx.fillStyle = PANEL
+  ctx.fillRect(0, 0, w, h)
+  ctx.beginPath()
+  ctx.rect(0, 0, w, h)
+  ctx.clip()
+  ctx.strokeStyle = 'rgba(27, 27, 58, 0.15)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  for (let d = -h; d < w; d += 9) {
+    ctx.moveTo(d, h)
+    ctx.lineTo(d + h, 0)
+  }
+  ctx.stroke()
+  ctx.translate(w / 2 - 16, h / 2 - 16)
+  ctx.scale(32 / 24, 32 / 24)
+  ctx.strokeStyle = 'rgba(27, 27, 58, 0.5)'
+  ctx.lineWidth = 1.7
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke(new Path2D('M4 5h16v14H4V5ZM4 16l5-5 4 4 3-3 4 4'))
+  ctx.restore()
+}
+
+function drawItem(ctx: CanvasRenderingContext2D, item: Item, pictures: Map<string, HTMLImageElement | null>) {
   const swatch = PALETTE[item.color] ?? PALETTE.yellow
 
   ctx.save()
@@ -159,49 +219,41 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
   switch (item.kind) {
     case 'stroke': {
       const points = item.points ?? []
-      if (points.length >= 4) {
-        ctx.beginPath()
-        for (let i = 0; i < points.length; i += 2) {
-          const px = points[i] - item.x
-          const py = points[i + 1] - item.y
-          if (i === 0) ctx.moveTo(px, py)
-          else ctx.lineTo(px, py)
-        }
-        ctx.strokeStyle = item.highlight ? swatch.dot : INK
+      if (points.length >= 2) {
+        const local = points.map((value, i) => value - (i % 2 === 0 ? item.x : item.y))
+        ctx.fillStyle = item.highlight ? swatch.dot : INK
         ctx.globalAlpha = item.highlight ? 0.45 : 1
-        ctx.lineWidth = item.stroke ?? 3
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-        ctx.stroke()
+        ctx.fill(new Path2D(inkPath(local, item.pressure, item.stroke ?? 3, !!item.highlight)))
         ctx.globalAlpha = 1
       }
+      break
+    }
+
+    case 'image': {
+      const img = item.src ? pictures.get(item.src) : null
+      if (img) ctx.drawImage(img, 0, 0, item.w, item.h)
+      else drawMissing(ctx, item.w, item.h)
+      sketch(ctx, item, 'frame', 'rgba(27, 27, 58, 0.7)', undefined, true)
       break
     }
 
     case 'frame': {
       ctx.fillStyle = PANEL
       ctx.globalAlpha = 0.5
-      roundedRect(ctx, item.w, item.h, FRAME_RADIUS)
-      ctx.fill()
+      ctx.fillRect(0, 0, item.w, item.h)
       ctx.globalAlpha = 1
-
-      ctx.strokeStyle = LINE
-      ctx.lineWidth = 2
-      ctx.setLineDash([6, 6])
-      roundedRect(ctx, item.w, item.h, FRAME_RADIUS)
-      ctx.stroke()
-      ctx.setLineDash([])
+      sketch(ctx, item, 'frame', 'rgba(27, 27, 58, 0.7)')
 
       // The label chip, above the top-left corner.
       const label = item.text || 'Frame'
-      ctx.font = `600 12px ${FONT}`
+      ctx.font = `600 12px ${font()}`
       const width = Math.min(ctx.measureText(label).width + 16, item.w)
-      ctx.fillStyle = INK
+      ctx.fillStyle = '#FF48B0'
       ctx.save()
       ctx.translate(0, -28)
       roundedRect(ctx, width, 22, 6)
       ctx.fill()
-      ctx.fillStyle = CANVAS
+      ctx.fillStyle = INK
       ctx.textBaseline = 'middle'
       ctx.fillText(label, 8, 12)
       ctx.restore()
@@ -209,9 +261,25 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
     }
 
     case 'shape': {
-      ctx.fillStyle = swatch.dot
-      roundedRect(ctx, item.w, item.h, RADIUS)
-      ctx.fill()
+      sketch(ctx, item, 'shape', swatch.line, swatch.tint)
+      if (item.text) {
+        // Centred both ways, in the inset the board uses, and clipped to the shape's box.
+        const pad = item.shape === 'diamond' ? item.w * 0.18 : 12
+        const width = item.w - pad * 2
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(0, 0, item.w, item.h)
+        ctx.clip()
+        ctx.font = `${item.weight ?? 600} ${BODY_SIZE}px ${font()}`
+        const lines = wrap(ctx, item.text, width)
+        const step = BODY_SIZE * LINE_HEIGHT
+        ctx.fillStyle = swatch.deep
+        ctx.textBaseline = 'top'
+        ctx.textAlign = 'center'
+        const top = (item.h - lines.length * step) / 2
+        lines.forEach((line, i) => ctx.fillText(line, item.w / 2, Math.max(0, top) + i * step))
+        ctx.restore()
+      }
       break
     }
 
@@ -231,14 +299,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
 
     // A comment is a sticky that happens to carry a name; both are drawn here.
     default: {
-      ctx.save()
-      ctx.shadowColor = 'rgba(16, 24, 40, 0.12)'
-      ctx.shadowBlur = 6
-      ctx.shadowOffsetY = 2
-      ctx.fillStyle = swatch.dot
-      roundedRect(ctx, item.w, item.h, RADIUS)
-      ctx.fill()
-      ctx.restore()
+      sketch(ctx, item, 'sticky', swatch.line, swatch.tint)
 
       const width = item.w - STICKY_PAD * 2
       const used = drawText(
@@ -263,13 +324,51 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
   ctx.restore()
 }
 
+/** A line or arrow, from the same `d` as the board, in world space. A bound end follows its item. */
+function drawConnector(ctx: CanvasRenderingContext2D, item: Item, ends: [number, number, number, number]) {
+  const line = (PALETTE[item.color] ?? PALETTE.slate).line
+  const head = item.head === 'end' ? 'end' : 'none'
+  ctx.save()
+  ctx.strokeStyle = line
+  ctx.lineWidth = SKETCH.strokeWidth
+  ctx.lineCap = 'round'
+  ctx.stroke(new Path2D(linePaths(ends, seedOf(item.id), line, head)))
+  ctx.restore()
+}
+
 /** How many device pixels per board unit, capped so a huge board still encodes. */
 function scaleFor(bounds: Bounds, want: number) {
   const longest = Math.max(bounds.w, bounds.h)
   return Math.min(want, Math.max(1, 8000 / longest))
 }
 
-export function toCanvas(items: Item[], want = 2) {
+/**
+ * Every picture the board uses, loaded for drawing. One that fails to load is
+ * `null` and is drawn as the placeholder: a missing file must not stop an export.
+ * Loaded with `crossOrigin` so the canvas is not tainted and can still be encoded;
+ * the image server sends the header that allows it.
+ */
+async function loadPictures(items: Item[]) {
+  const keys = new Set(items.flatMap((i) => (i.kind === 'image' && i.src && KEY_RE.test(i.src) ? [i.src] : [])))
+  const loaded = new Map<string, HTMLImageElement | null>()
+  await Promise.all(
+    [...keys].map(async (key) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = `${IMG_BASE}/img/${key}`
+      try {
+        await img.decode()
+        loaded.set(key, img)
+      } catch {
+        loaded.set(key, null)
+      }
+    }),
+  )
+  return loaded
+}
+
+export async function toCanvas(items: Item[], want = 2) {
+  const pictures = await loadPictures(items)
   const bounds = boundsOf(items)
   const scale = scaleFor(bounds, want)
 
@@ -287,7 +386,11 @@ export function toCanvas(items: Item[], want = 2) {
   ctx.translate(-bounds.x, -bounds.y)
 
   // Back to front, the same order the board stacks them in.
-  for (const item of [...items].sort((a, b) => a.z - b.z)) drawItem(ctx, item)
+  const byId = new Map(items.filter((i) => i.kind !== 'connector').map((i) => [i.id, i]))
+  for (const item of [...items].sort((a, b) => a.z - b.z)) {
+    if (item.kind === 'connector') drawConnector(ctx, item, connectorEnds(item, byId))
+    else drawItem(ctx, item, pictures)
+  }
 
   return { canvas, scale, bounds }
 }

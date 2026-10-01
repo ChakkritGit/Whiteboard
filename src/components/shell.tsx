@@ -1,7 +1,16 @@
+import { Mali } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { THEME_SCRIPT } from '@/lib/theme-script'
 import type { Lang } from '@/lib/dictionary'
+
+/* Self-hosted at build time, so there is no runtime request to Google. */
+const hand = Mali({
+  subsets: ['thai', 'latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-hand',
+  display: 'swap',
+})
 
 /**
  * The document, shared by both root layouts.
@@ -14,7 +23,7 @@ import type { Lang } from '@/lib/dictionary'
  */
 export function Shell({ lang, children }: { lang: Lang; children: React.ReactNode }) {
   return (
-    <html lang={lang} suppressHydrationWarning>
+    <html lang={lang} className={hand.variable} suppressHydrationWarning>
       {/* eslint-disable-next-line @next/next/no-head-element -- that rule is
           for the Pages Router; a root layout in the App Router owns its head,
           and this script has to run before the first paint. */}

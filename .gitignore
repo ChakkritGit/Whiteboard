@@ -45,3 +45,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 MEMORY.md
+
+# uploaded pictures from the local room server
+/.images/

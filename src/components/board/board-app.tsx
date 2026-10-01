@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE } from '@/lib/palette'
-import { bounds, overlaps, turn } from '@/lib/geometry'
+import { bounds, connectorEnds, overlaps, turn, type Box } from '@/lib/geometry'
 import {
   addItem,
   bringToFront,
   groupItems,
+  placeTemplate,
   removeItems,
   renameGroup,
   replaceAll,
@@ -27,7 +28,11 @@ import {
 import { saveMe, type Me } from '@/lib/identity'
 import { useLang } from '@/lib/i18n'
 import { BadFile, EmptyBoard, download, downloadPicture, readFile } from '@/lib/io'
+import { inkPath } from '@/lib/ink'
+import { TEMPLATES, type TemplateId } from '@/lib/templates'
+import { UploadError, uploadImage } from '@/lib/upload'
 import { BoardItem, type Corner } from './board-item'
+import { Guide } from '../guide/globe'
 import { ContextMenu, type MenuEntry } from './menu'
 import {
   Cursors,
@@ -45,6 +50,14 @@ const MAX_ZOOM = 4
 const MIN_W = 40
 const MIN_H = 24
 
+/** The box a connector's two ends fit in. */
+const span = ([x1, y1, x2, y2]: [number, number, number, number]) => ({
+  x: Math.min(x1, x2),
+  y: Math.min(y1, y2),
+  w: Math.max(1, Math.abs(x2 - x1)),
+  h: Math.max(1, Math.abs(y2 - y1)),
+})
+
 /**
  * What a new thing of each kind starts out as.
  *
@@ -56,6 +69,8 @@ const SIZES: Record<string, { w: number; h: number }> = {
   sticky: { w: 168, h: 132 },
   text: { w: 220, h: 40 },
   shape: { w: 180, h: 120 },
+  ellipse: { w: 180, h: 120 },
+  diamond: { w: 180, h: 120 },
   frame: { w: 520, h: 380 },
 }
 
@@ -98,13 +113,20 @@ export function BoardApp({ room }: { room: string }) {
   const [panning, setPanning] = useState(false)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; on: string | null } | null>(null)
+  /** Pictures on their way up. Local only: the document gets the item once the file is stored. */
+  const [uploading, setUploading] = useState<{ id: string; x: number; y: number; name: string }[]>([])
 
   const surface = useRef<HTMLDivElement>(null)
+  const picker = useRef<HTMLInputElement>(null)
   const drag = useRef<{ ids: string[]; from: { x: number; y: number }; start: Map<string, { x: number; y: number }> } | null>(null)
   const pan = useRef<{ x: number; y: number; camera: Camera } | null>(null)
-  const drawing = useRef<{ id: string; points: number[]; sent: number } | null>(null)
+  const drawing = useRef<{ id: string; points: number[]; pressure: number[]; real: boolean; sent: number } | null>(null)
   const band = useRef<{ x: number; y: number; add: string[] } | null>(null)
   const erasing = useRef(false)
+  /** A line or arrow being dragged out: where it started, and what it started on. */
+  const linking = useRef<{ x: number; y: number; from?: string } | null>(null)
+  /** A connector's end grip being dragged, and whether it has actually moved yet. */
+  const regrip = useRef<{ id: string; end: 'start' | 'end'; moved: boolean } | null>(null)
   const rotating = useRef<{ id: string; cx: number; cy: number; from: number; start: number } | null>(null)
   const resize = useRef<{
     id: string
@@ -113,6 +135,8 @@ export function BoardApp({ room }: { room: string }) {
     box: { x: number; y: number; w: number; h: number }
     angle: number
     points?: number[]
+    /** A picture's width over its height, which the grips must not change. */
+    aspect?: number
   } | null>(null)
   /**
    * The stroke currently under the pen, drawn straight to the screen.
@@ -123,7 +147,10 @@ export function BoardApp({ room }: { room: string }) {
    * local copy at the full pointer rate; the document is caught up a few times a
    * second so the room can watch the line grow, and settled exactly on release.
    */
-  const [draft, setDraft] = useState<{ points: number[]; width: number; highlight: boolean; color: Swatch } | null>(null)
+  /** The line being dragged out, and the item it would bind to if let go now. */
+  const [link, setLink] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const [draft, setDraft] = useState<{ points: number[]; pressure?: number[]; width: number; highlight: boolean; color: Swatch } | null>(null)
   /**
    * A note made by this press, waiting for the press to finish before it is put
    * into edit mode. Setting it straight away focuses the note mid-click, and the
@@ -141,6 +168,16 @@ export function BoardApp({ room }: { room: string }) {
 
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
   const ink: Swatch = tinted ? color : 'slate'
+  /** What a connector can bind to: anything that is not itself a connector. */
+  const solid = useMemo(
+    () => new Map(items.filter((i) => i.kind !== 'connector').map((i) => [i.id, i as Box])),
+    [items],
+  )
+  // Read by gesture code that must not change identity every time the items do.
+  const latest = useRef({ items, solid })
+  useEffect(() => {
+    latest.current = { items, solid }
+  })
 
   /**
    * Your own pointer, in your own colour.
@@ -248,11 +285,12 @@ export function BoardApp({ room }: { room: string }) {
 
   /** Write a stroke's path and the box it fits in. */
   const commitStroke = useCallback(
-    (id: string, points: number[]) => {
+    (id: string, points: number[], pressure?: number[]) => {
       const xs = points.filter((_, i) => i % 2 === 0)
       const ys = points.filter((_, i) => i % 2 === 1)
       updateItem(board, id, {
         points,
+        ...(pressure && { pressure }),
         x: Math.min(...xs),
         y: Math.min(...ys),
         w: Math.max(1, Math.max(...xs) - Math.min(...xs)),
@@ -262,10 +300,58 @@ export function BoardApp({ room }: { room: string }) {
     [board],
   )
 
-  const autoSize = useCallback(
-    (id: string, height: number) => updateItem(board, id, { h: height }),
+  /** Write a connector's ends, and the box they fit in. */
+  const commitEnds = useCallback(
+    (id: string, ends: [number, number, number, number], clear: (keyof Item)[] = []) =>
+      updateItem(board, id, { points: ends, ...span(ends) }, clear),
     [board],
   )
+
+  /**
+   * Move every connector bound to one of these items to match, in the same
+   * gesture as the move, so one undo takes back both. The moved boxes are passed
+   * in rather than read back, because the document has not caught up with them
+   * yet.
+   */
+  const follow = useCallback(
+    (moved: Map<string, Box>) => {
+      const { items: all, solid: boxes } = latest.current
+      for (const c of all) {
+        if (c.kind !== 'connector') continue
+        if (!(c.from && moved.has(c.from)) && !(c.to && moved.has(c.to))) continue
+        const pair = new Map<string, Box>()
+        for (const id of [c.from, c.to]) {
+          const box = id ? (moved.get(id) ?? boxes.get(id)) : undefined
+          if (id && box) pair.set(id, box)
+        }
+        commitEnds(c.id, connectorEnds(c, pair))
+      }
+    },
+    [commitEnds],
+  )
+
+  const autoSize = useCallback(
+    (id: string, height: number) => {
+      updateItem(board, id, { h: height })
+      const box = latest.current.solid.get(id)
+      if (box) follow(new Map([[id, { ...box, h: height }]]))
+    },
+    [board, follow],
+  )
+
+  /**
+   * The item a line would bind to at this point on screen, if any. Found the way
+   * the eraser finds things. Frames and strokes are left out: starting an arrow
+   * on empty ground inside a frame would otherwise pin it to the frame.
+   */
+  const bindTarget = (clientX: number, clientY: number) => {
+    for (const node of document.elementsFromPoint(clientX, clientY)) {
+      const id = (node as HTMLElement).closest?.<HTMLElement>('[data-item]')?.dataset.item
+      const kind = id ? byId.get(id)?.kind : undefined
+      if (id && kind && kind !== 'connector' && kind !== 'frame' && kind !== 'stroke') return id
+    }
+    return undefined
+  }
 
   /**
    * Tell the document which language it is actually in.
@@ -322,6 +408,9 @@ export function BoardApp({ room }: { room: string }) {
             x: entry.x + offset,
             y: entry.y + offset,
             points: entry.points?.map((value) => value + offset),
+            // A copy of a connector is not bound to the originals it was drawn between.
+            from: undefined,
+            to: undefined,
           }),
         )
       history.seal()
@@ -359,19 +448,79 @@ export function BoardApp({ room }: { room: string }) {
         x: entry.x + 28,
         y: entry.y + 28,
         points: entry.points?.map((value) => value + 28),
+        from: undefined,
+        to: undefined,
       }),
     )
     history.seal()
     setSelection(made)
   }, [board, clipboard, history])
 
+  /** The middle of what is on screen, in board units, nudged so a batch does not stack. */
+  const centre = useCallback(
+    (nudge = 0) => ({
+      x: (viewport.w / 2 - camera.x) / camera.zoom + nudge * 24,
+      y: (viewport.h / 2 - camera.y) / camera.zoom + nudge * 24,
+    }),
+    [camera, viewport],
+  )
+
+  /**
+   * Upload a picture and put it on the board, centred on a point.
+   *
+   * Nothing goes into the document until the file is stored: a peer would
+   * otherwise get an item whose picture does not exist yet. A card stands in
+   * meanwhile, in this tab only.
+   */
+  const place = useCallback(
+    async (file: File, at: { x: number; y: number }) => {
+      const token = crypto.randomUUID()
+      setUploading((now) => [...now, { id: token, x: at.x, y: at.y, name: file.name }])
+      try {
+        const { key, aspect, width } = await uploadImage(file)
+        const w = Math.min(480, Math.max(MIN_W, width))
+        const h = w / aspect
+        const id = addItem(board, { kind: 'image', src: key, aspect, x: at.x - w / 2, y: at.y - h / 2, w, h, text: '', color: 'slate' })
+        history.seal()
+        setSelection([id])
+      } catch (error) {
+        const said = {
+          tooBig: t.imgTooBig,
+          wrongType: t.imgWrongType,
+          tooMany: t.imgTooMany,
+          offline: t.imgOffline,
+        }
+        setToast(error instanceof UploadError ? said[error.code] : t.imgOffline)
+      } finally {
+        setUploading((now) => now.filter((entry) => entry.id !== token))
+      }
+    },
+    [board, history, t],
+  )
+
+  /** A tool button or its key. The picture tool is a file picker, not a mode. */
+  /** Drop a template at the middle of the view, as one undo step, and select it. */
+  const addTemplate = (id: TemplateId, name: string) => {
+    const tpl = TEMPLATES.find((entry) => entry.id === id)
+    if (!tpl) return
+    const words = Object.fromEntries(Object.entries(t).filter(([, v]) => typeof v === 'string')) as Record<string, string>
+    const made = placeTemplate(board, tpl.build(words, centre()), name)
+    history.seal()
+    setSelection(made)
+  }
+
+  const choose = (next: Tool) => {
+    if (next === 'image') picker.current?.click()
+    else setTool(next)
+  }
+
   const applyColor = useCallback(
     (swatch: Swatch) => {
       setColor(swatch)
       setTinted(true)
       // A frame is a boundary, not an object with a fill — it has no colour to
-      // change, and pretending otherwise just makes the picker lie.
-      const targets = selection.filter((id) => byId.get(id)?.kind !== 'frame')
+      // change, and pretending otherwise just makes the picker lie. Nor has a picture.
+      const targets = selection.filter((id) => byId.get(id)?.kind !== 'frame' && byId.get(id)?.kind !== 'image')
       targets.forEach((id) => updateItem(board, id, { color: swatch }))
       if (targets.length) history.seal()
     },
@@ -458,6 +607,13 @@ export function BoardApp({ room }: { room: string }) {
     const at = toWorld(event.clientX, event.clientY)
 
     if (tool === 'pen' || tool === 'highlighter') {
+      // A palm resting on the glass while the pencil writes must not start a
+      // second stroke.
+      if (drawing.current && event.pointerType === 'touch') return
+      // Pressure is only kept from a pen: a mouse reports a constant, and a
+      // stroke without any is drawn with simulated pressure instead.
+      const real = event.pointerType === 'pen'
+      const first = real ? [event.pressure] : []
       const stroke = tool === 'highlighter' ? Math.max(10, width * 3) : width
       const id = addItem(board, {
         kind: 'stroke',
@@ -471,9 +627,10 @@ export function BoardApp({ room }: { room: string }) {
         stroke,
         highlight: tool === 'highlighter',
       })
-      drawing.current = { id, points: [at.x, at.y], sent: 2 }
+      drawing.current = { id, points: [at.x, at.y], pressure: first, real, sent: 2 }
       setDraft({
         points: [at.x, at.y],
+        pressure: real ? first : undefined,
         width: stroke,
         highlight: tool === 'highlighter',
         color: tool === 'highlighter' ? color : ink,
@@ -482,11 +639,22 @@ export function BoardApp({ room }: { room: string }) {
       return
     }
 
+    if (tool === 'line' || tool === 'arrow') {
+      const from = bindTarget(event.clientX, event.clientY)
+      linking.current = { x: at.x, y: at.y, from }
+      setLink({ x1: at.x, y1: at.y, x2: at.x, y2: at.y })
+      setOver(from ?? null)
+      surface.current?.setPointerCapture(event.pointerId)
+      return
+    }
+
     const spec = SIZES[tool] ?? SIZES.sticky
     const placeholder =
       tool === 'sticky' ? t.newNote : tool === 'text' ? t.newText : tool === 'frame' ? t.newFrame : ''
+    const round = tool === 'ellipse' || tool === 'diamond'
     const id = addItem(board, {
-      kind: tool as Item['kind'],
+      kind: round ? 'shape' : (tool as Item['kind']),
+      shape: round ? tool : undefined,
       x: at.x - spec.w / 2,
       y: at.y - spec.h / 2,
       w: spec.w,
@@ -538,10 +706,48 @@ export function BoardApp({ room }: { room: string }) {
       return
     }
 
+    if (linking.current) {
+      setLink((current) => current && { ...current, x2: at.x, y2: at.y })
+      setOver(bindTarget(event.clientX, event.clientY) ?? null)
+      return
+    }
+
+    if (regrip.current) {
+      const grip = regrip.current
+      const conn = byId.get(grip.id)
+      if (conn?.points) {
+        grip.moved = true
+        // The end being dragged is free for as long as it is in the hand; it is
+        // bound again on release, if it was let go over something.
+        const start = grip.end === 'start'
+        const points = conn.points.slice()
+        points[start ? 0 : 2] = at.x
+        points[start ? 1 : 3] = at.y
+        const ends = connectorEnds(
+          { from: start ? undefined : conn.from, to: start ? conn.to : undefined, points },
+          solid,
+        )
+        commitEnds(grip.id, ends, [start ? 'from' : 'to'])
+      }
+      setOver(bindTarget(event.clientX, event.clientY) ?? null)
+      return
+    }
+
     if (drawing.current) {
       const stroke = drawing.current
-      stroke.points.push(at.x, at.y)
-      setDraft((current) => (current ? { ...current, points: stroke.points.slice() } : current))
+      // Every sample the pencil took since the last move, not just the one the
+      // browser chose to deliver: it reports about 240Hz against 60Hz of moves.
+      const coalesced = event.nativeEvent.getCoalescedEvents?.()
+      for (const sample of coalesced?.length ? coalesced : [event.nativeEvent]) {
+        const p = toWorld(sample.clientX, sample.clientY)
+        stroke.points.push(p.x, p.y)
+        if (stroke.real) stroke.pressure.push(sample.pressure)
+      }
+      setDraft((current) =>
+        current
+          ? { ...current, points: stroke.points.slice(), pressure: stroke.real ? stroke.pressure.slice() : undefined }
+          : current,
+      )
 
       // Caught up every twelfth point rather than on every move: the whole path
       // goes into the document each time, so at pointer rate a long stroke is
@@ -551,7 +757,7 @@ export function BoardApp({ room }: { room: string }) {
       // decides how much there is to send.
       if (stroke.points.length - stroke.sent >= 24) {
         stroke.sent = stroke.points.length
-        commitStroke(stroke.id, stroke.points)
+        commitStroke(stroke.id, stroke.points, stroke.real ? stroke.pressure : undefined)
       }
       return
     }
@@ -563,7 +769,10 @@ export function BoardApp({ room }: { room: string }) {
       // Shift snaps to the twenty-four points of the compass, which is what you
       // want whenever the answer is "straight" or "exactly forty-five".
       if (event.shiftKey) angle = Math.round(angle / 15) * 15
-      updateItem(board, spin.id, { angle: ((angle % 360) + 360) % 360 })
+      const turned = ((angle % 360) + 360) % 360
+      updateItem(board, spin.id, { angle: turned })
+      const box = solid.get(spin.id)
+      if (box) follow(new Map([[spin.id, { ...box, angle: turned }]]))
       return
     }
 
@@ -582,8 +791,15 @@ export function BoardApp({ room }: { room: string }) {
       // Floored rather than allowed to invert: dragging a corner through the
       // opposite one would otherwise give a negative width, which lays the note
       // out backwards and puts its own grips out of reach.
-      const w = Math.max(MIN_W, box.w + (east ? local.x : west ? -local.x : 0))
-      const h = Math.max(MIN_H, box.h + (south ? local.y : north ? -local.y : 0))
+      let w = Math.max(MIN_W, box.w + (east ? local.x : west ? -local.x : 0))
+      let h = Math.max(MIN_H, box.h + (south ? local.y : north ? -local.y : 0))
+      if (grip.aspect) {
+        // A picture keeps its shape. The width leads, except on the top and
+        // bottom grips where the height does; both floors still hold.
+        if (grip.corner === 'n' || grip.corner === 's') w = Math.max(MIN_W, h * grip.aspect)
+        w = Math.max(w, MIN_H * grip.aspect)
+        h = w / grip.aspect
+      }
 
       // The corner opposite the one being dragged stays exactly where it is, in
       // world space, however the note is turned.
@@ -612,6 +828,8 @@ export function BoardApp({ room }: { room: string }) {
         )
 
       updateItem(board, grip.id, { w, h, x, y, points })
+      const sized = solid.get(grip.id)
+      if (sized) follow(new Map([[grip.id, { ...sized, x, y, w, h }]]))
       return
     }
 
@@ -619,10 +837,13 @@ export function BoardApp({ room }: { room: string }) {
       const move = drag.current
       const dx = at.x - move.from.x
       const dy = at.y - move.from.y
+      const moved = new Map<string, Box>()
       move.ids.forEach((id) => {
         const origin = move.start.get(id)
         if (!origin) return
         const item = byId.get(id)
+        const box = solid.get(id)
+        if (box) moved.set(id, { ...box, x: origin.x + dx, y: origin.y + dy })
         updateItem(board, id, {
           x: origin.x + dx,
           y: origin.y + dy,
@@ -631,6 +852,7 @@ export function BoardApp({ room }: { room: string }) {
           ),
         })
       })
+      follow(moved)
     }
   }
 
@@ -638,7 +860,8 @@ export function BoardApp({ room }: { room: string }) {
     if (surface.current?.hasPointerCapture?.(event.pointerId)) {
       surface.current.releasePointerCapture(event.pointerId)
     }
-    const changed = drag.current || resize.current || drawing.current || rotating.current || erasing.current
+    const changed =
+      drag.current || resize.current || drawing.current || rotating.current || erasing.current || linking.current || regrip.current
 
     if (band.current) {
       const from = band.current
@@ -660,6 +883,50 @@ export function BoardApp({ room }: { room: string }) {
       setMarquee(null)
     }
 
+    const line = linking.current
+    linking.current = null
+    if (line) {
+      const at = toWorld(event.clientX, event.clientY)
+      const to = bindTarget(event.clientX, event.clientY)
+      setLink(null)
+      setOver(null)
+      // A click, or a line that starts and ends on the one item, makes nothing.
+      const looped = Boolean(line.from) && line.from === to
+      if (!looped && (Math.hypot(at.x - line.x, at.y - line.y) >= 6 || line.from || to)) {
+        const ends = connectorEnds({ from: line.from, to, points: [line.x, line.y, at.x, at.y] }, solid)
+        const id = addItem(board, {
+          kind: 'connector',
+          points: ends,
+          from: line.from,
+          to,
+          head: tool === 'arrow' ? 'end' : 'none',
+          color: ink,
+          text: '',
+          ...span(ends),
+        })
+        setTool('select')
+        setSelection([id])
+      }
+    }
+
+    const grip = regrip.current
+    regrip.current = null
+    const conn = grip && byId.get(grip.id)
+    if (grip?.moved && conn) {
+      const target = bindTarget(event.clientX, event.clientY)
+      const start = grip.end === 'start'
+      const other = start ? conn.to : conn.from
+      const bound = target && target !== other ? target : undefined
+      const from = start ? bound : conn.from
+      const to = start ? conn.to : bound
+      const clear: (keyof Item)[] = []
+      if (!from) clear.push('from')
+      if (!to) clear.push('to')
+      updateItem(board, conn.id, { from, to }, clear)
+      commitEnds(conn.id, connectorEnds({ from, to, points: conn.points }, solid), clear)
+      setOver(null)
+    }
+
     pan.current = null
     setPanning(false)
     drag.current = null
@@ -670,7 +937,7 @@ export function BoardApp({ room }: { room: string }) {
     drawing.current = null
 
     if (finished) {
-      commitStroke(finished.id, finished.points)
+      commitStroke(finished.id, finished.points, finished.real ? finished.pressure : undefined)
       setDraft(null)
     }
 
@@ -690,7 +957,14 @@ export function BoardApp({ room }: { room: string }) {
       box: { x: item.x, y: item.y, w: item.w, h: item.h },
       angle: item.angle ?? 0,
       points: item.points,
+      aspect: item.kind === 'image' && item.aspect && item.aspect > 0 ? item.aspect : undefined,
     }
+    ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+  }
+
+  const onEndGrip = (item: Item) => (end: 'start' | 'end', event: React.PointerEvent) => {
+    if (item.locked) return
+    regrip.current = { id: item.id, end, moved: false }
     ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
   }
 
@@ -768,7 +1042,9 @@ export function BoardApp({ room }: { room: string }) {
     const start = new Map<string, { x: number; y: number }>()
     ids.forEach((id) => {
       const found = byId.get(id)
-      if (found && !found.locked) start.set(id, { x: found.x, y: found.y })
+      // A connector tied to something is moved by what it is tied to, not by hand.
+      const tied = found?.kind === 'connector' && Boolean((found.from && solid.has(found.from)) || (found.to && solid.has(found.to)))
+      if (found && !found.locked && !tied) start.set(id, { x: found.x, y: found.y })
     })
     drag.current = { ids: [...start.keys()], from: toWorld(event.clientX, event.clientY), start }
     // Captured on the note rather than the board. Capturing on the board
@@ -916,10 +1192,8 @@ export function BoardApp({ room }: { room: string }) {
         setSelection([])
         return
       }
-      if (mod && key === 'v') {
-        paste()
-        return
-      }
+      // Cmd+V is not handled here: the `paste` event below sees what is on the
+      // system clipboard, and a picture there must not also paste our own copy.
       if (mod && key === 'd' && selection.length) {
         event.preventDefault()
         setSelection(duplicate(selection))
@@ -956,9 +1230,17 @@ export function BoardApp({ room }: { room: string }) {
         n: 'sticky',
         t: 'text',
         f: 'frame',
+        o: 'ellipse',
+        d: 'diamond',
+        l: 'line',
+        a: 'arrow',
+        i: 'image',
       }
       const next = shortcuts[key]
-      if (next && !mod) setTool(next)
+      if (next && !mod) {
+        if (next === 'image') picker.current?.click()
+        else setTool(next)
+      }
     }
 
     // Space is the hand. Held down it turns any drag into a pan, over a note as
@@ -991,7 +1273,27 @@ export function BoardApp({ room }: { room: string }) {
       window.removeEventListener('keyup', onSpaceUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [board, byId, copy, duplicate, groups, history, items, paste, selection, t])
+  }, [board, byId, copy, duplicate, groups, history, items, selection, t])
+
+  // A picture on the system clipboard is uploaded; otherwise this is the board's
+  // own paste. Never both: the picture wins and the event is stopped.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const typing =
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable || event.target.tagName === 'INPUT')
+      if (typing) return
+      const pictures = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
+      if (pictures.length) {
+        event.preventDefault()
+        pictures.forEach((file, i) => void place(file, centre(i)))
+        return
+      }
+      paste()
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [centre, paste, place])
 
   /* -------------------------------- wheel -------------------------------- */
 
@@ -1154,6 +1456,16 @@ export function BoardApp({ room }: { room: string }) {
           event.preventDefault()
           setMenu({ x: event.clientX, y: event.clientY, on: null })
         }}
+        // Cancelled for any file, or the browser opens a dropped file in place of the board.
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes('Files')) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.files.length) return
+          event.preventDefault()
+          const at = toWorld(event.clientX, event.clientY)
+          Array.from(event.dataTransfer.files).forEach((file, i) => void place(file, { x: at.x + i * 24, y: at.y + i * 24 }))
+        }}
         className={`board-paper absolute inset-0 touch-none ${tool === 'eraser' && !spaceHeld ? 'cursor-eraser' : ''}`}
         style={{
           cursor: tool === 'eraser' && !spaceHeld ? undefined : cursor,
@@ -1176,6 +1488,12 @@ export function BoardApp({ room }: { room: string }) {
               onDoubleClick={() => setEditing(item.id)}
               onChange={(text) => updateItem(board, item.id, { text })}
               onAutoSize={autoSize}
+              ends={item.kind === 'connector' ? connectorEnds(item, solid) : undefined}
+              onEndDown={
+                selection.length === 1 && selection[0] === item.id && !item.locked
+                  ? onEndGrip(item)
+                  : undefined
+              }
               onResize={
                 selection.length === 1 && selection[0] === item.id && !item.locked
                   ? onItemResize(item)
@@ -1189,6 +1507,18 @@ export function BoardApp({ room }: { room: string }) {
             />
           ))}
 
+          {uploading.map((entry) => (
+            <div
+              key={entry.id}
+              className="upload-card pointer-events-none absolute grid place-items-center rounded-sm"
+              style={{ left: entry.x - 100, top: entry.y - 60, width: 200, height: 120, zIndex: 99996 }}
+            >
+              <span className="max-w-[90%] truncate rounded-sm bg-panel px-2 py-0.5 text-xs font-semibold">
+                {t.uploading} {entry.name}
+              </span>
+            </div>
+          ))}
+
           {marquee && (marquee.w > 2 || marquee.h > 2) && (
             <div
               className="pointer-events-none absolute border border-accent bg-accent/10"
@@ -1196,19 +1526,34 @@ export function BoardApp({ room }: { room: string }) {
             />
           )}
 
-          {draft && draft.points.length >= 4 && (
+          {over && byId.get(over) && (
+            <div
+              className="pointer-events-none absolute rounded outline-2 outline-offset-2 outline-accent"
+              style={{ ...bounds(byId.get(over) as Item), zIndex: 99997 }}
+            />
+          )}
+
+          {link && (
+            <svg className="pointer-events-none absolute overflow-visible" style={{ left: 0, top: 0, zIndex: 9999 }}>
+              <line
+                x1={link.x1}
+                y1={link.y1}
+                x2={link.x2}
+                y2={link.y2}
+                stroke="var(--color-accent)"
+                strokeWidth={2}
+                strokeDasharray="6 5"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+
+          {draft && draft.points.length >= 2 && (
             <svg className="pointer-events-none absolute overflow-visible" style={{ left: 0, top: 0, zIndex: 9999 }}>
               <path
-                d={draft.points.reduce(
-                  (path, value, i) => (i % 2 === 0 ? `${path}${i === 0 ? 'M' : 'L'}${value} ` : `${path}${value} `),
-                  '',
-                )}
-                fill="none"
-                stroke={draft.highlight ? PALETTE[draft.color].dot : PALETTE[draft.color].deep}
-                strokeWidth={draft.width}
-                strokeOpacity={draft.highlight ? 0.45 : 1}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                d={inkPath(draft.points, draft.pressure, draft.width, draft.highlight)}
+                fill={draft.highlight ? PALETTE[draft.color].dot : PALETTE[draft.color].deep}
+                fillOpacity={draft.highlight ? 0.45 : 1}
               />
             </svg>
           )}
@@ -1219,7 +1564,7 @@ export function BoardApp({ room }: { room: string }) {
 
       <ToolDock
         tool={tool}
-        onTool={setTool}
+        onTool={choose}
         color={color}
         onColor={applyColor}
         width={width}
@@ -1227,8 +1572,22 @@ export function BoardApp({ room }: { room: string }) {
         weight={weight}
         onWeight={applyWeight}
         showType={showType}
+        onTemplate={addTemplate}
+      />
+      <input
+        ref={picker}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          Array.from(event.target.files ?? []).forEach((file, i) => void place(file, centre(i)))
+          // Cleared so choosing the same file twice fires again.
+          event.target.value = ''
+        }}
       />
       <MiniMap items={items} camera={camera} viewport={viewport} />
+      <Guide board={board} items={items} camera={camera} viewport={viewport} history={history} select={setSelection} />
       {menu && <ContextMenu at={menu} entries={entries} onClose={() => setMenu(null)} />}
       <Toast message={toast} onDone={() => setToast(null)} />
     </main>

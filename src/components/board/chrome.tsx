@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE, SWATCHES } from '@/lib/palette'
 import { WS_URL } from '@/lib/board'
+import { TEMPLATES, resolveRefs, type TemplateId } from '@/lib/templates'
 import type { Me } from '@/lib/identity'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { useLang } from '@/lib/i18n'
@@ -65,7 +66,7 @@ export function TopBar({
         onChange={(event) => onTitle(event.target.value)}
         placeholder={t.untitled}
         aria-label={t.boardTitle}
-        className="min-w-0 max-w-[18rem] flex-1 rounded-md px-2 py-1 text-[15px] font-semibold outline-none hover:bg-canvas focus:bg-canvas sm:flex-none"
+        className="font-hand min-w-0 max-w-[18rem] flex-1 rounded-md px-2 py-1 text-[15px] font-semibold outline-none hover:bg-canvas focus:bg-canvas sm:flex-none"
       />
 
       <div className="ml-auto flex items-center gap-2">
@@ -73,11 +74,11 @@ export function TopBar({
           title={live ? t.connectedTo(WS_URL) : t.notConnectedTo(WS_URL)}
           className={`hidden cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
             live
-              ? 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7]'
+              ? 'bg-[#00A95C]/15 text-[#00512B] dark:text-[#A8E6C6]'
               : 'bg-canvas text-muted'
           }`}
         >
-          <span className={`size-1.5 rounded-full ${live ? 'bg-[#10b981]' : 'bg-[#9ca3af]'}`} />
+          <span className={`size-1.5 rounded-full ${live ? 'bg-[#00A95C]' : 'bg-[#9ca3af]'}`} />
           {live ? t.live : t.offline}
         </span>
 
@@ -120,7 +121,7 @@ export function TopBar({
             type="button"
             onClick={onReset}
             title={t.resetZoom}
-            className="w-12 text-center text-xs font-semibold tabular-nums hover:text-accent"
+            className="w-12 text-center text-xs font-semibold tabular-nums hover:text-accent-ink"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -215,7 +216,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onShare}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-white hover:brightness-110"
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-[#1B1B3A] shadow-[3px_3px_0_var(--color-ink)] hover:-translate-y-px"
         >
           {shared ? t.linkCopied : t.share}
         </button>
@@ -268,7 +269,7 @@ function ThemeSwitch({ mounted }: { mounted: boolean }) {
           onClick={() => setMode(entry.id)}
           className={`grid size-7 place-items-center rounded-md transition-colors ${
             mounted && mode === entry.id
-              ? 'bg-accent/12 text-accent'
+              ? 'bg-accent/12 text-accent-ink'
               : 'text-muted hover:text-ink'
           }`}
         >
@@ -305,7 +306,7 @@ function LanguageSwitch({ mounted }: { mounted: boolean }) {
           aria-pressed={mounted && lang === option.id}
           onClick={() => setLang(option.id)}
           className={`grid h-7 min-w-8 place-items-center rounded-md px-1.5 text-xs font-bold transition-colors ${
-            mounted && lang === option.id ? 'bg-accent/12 text-accent' : 'text-muted hover:text-ink'
+            mounted && lang === option.id ? 'bg-accent/12 text-accent-ink' : 'text-muted hover:text-ink'
           }`}
         >
           {option.label}
@@ -385,6 +386,28 @@ export type Tool =
   | 'sticky'
   | 'text'
   | 'frame'
+  | 'ellipse'
+  | 'diamond'
+  | 'line'
+  | 'arrow'
+  | 'image'
+
+/** The Riso ink each tool lights up in when it is the active one. */
+const TOOL_INK: Record<Tool, Swatch> = {
+  select: 'slate',
+  pen: 'indigo',
+  highlighter: 'yellow',
+  eraser: 'red',
+  shape: 'green',
+  sticky: 'amber',
+  text: 'lavender',
+  frame: 'magenta',
+  ellipse: 'green',
+  diamond: 'green',
+  line: 'slate',
+  arrow: 'indigo',
+  image: 'sky',
+}
 
 const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
   { id: 'select', key: 'V', path: <path d="M6 3l13 8-6 1.5L10 19 6 3Z" /> },
@@ -396,6 +419,10 @@ const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
   },
   { id: 'eraser', key: 'E', path: <path d="M6 18h13M8 18l-4-4 8-8 6 6-6 6" /> },
   { id: 'shape', key: 'R', path: <rect x="4" y="6" width="16" height="12" rx="2" /> },
+  { id: 'ellipse', key: 'O', path: <ellipse cx="12" cy="12" rx="8" ry="6" /> },
+  { id: 'diamond', key: 'D', path: <path d="M12 4l8 8-8 8-8-8 8-8Z" /> },
+  { id: 'line', key: 'L', path: <path d="M5 19L19 5" /> },
+  { id: 'arrow', key: 'A', path: <path d="M5 19L19 5M10 5h9v9" /> },
   {
     id: 'sticky',
     key: 'N',
@@ -403,7 +430,11 @@ const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
   },
   { id: 'text', key: 'T', path: <path d="M5 6h14M12 6v13M9 19h6" /> },
   { id: 'frame', key: 'F', path: <path d="M8 3v18M16 3v18M3 8h18M3 16h18" /> },
+  { id: 'image', key: 'I', path: <path d="M4 5h16v14H4V5ZM4 16l5-5 4 4 3-3 4 4M15 9h.01" /> },
 ]
+
+/** The tools that share the one shape button; the rest of them have a button each. */
+const SHAPES: Tool[] = ['shape', 'ellipse', 'diamond']
 
 /** Pen widths, in board units. */
 const WIDTHS = [2, 4, 8, 14]
@@ -419,6 +450,7 @@ export function ToolDock({
   weight,
   onWeight,
   showType,
+  onTemplate,
 }: {
   tool: Tool
   onTool: (next: Tool) => void
@@ -430,9 +462,16 @@ export function ToolDock({
   onWeight: (next: number) => void
   /** Whether anything the type controls apply to is in play. */
   showType: boolean
+  onTemplate: (id: TemplateId, name: string) => void
 }) {
   const { t } = useLang()
   const [palette, setPalette] = useState(false)
+  const [templates, setTemplates] = useState(false)
+  const [tab, setTab] = useState<'planning' | 'software'>('planning')
+  const [flyout, setFlyout] = useState(false)
+  // The shape button shows whichever shape was used last, so one click repeats it.
+  const [lastShape, setLastShape] = useState<Tool>('shape')
+  if (SHAPES.includes(tool) && tool !== lastShape) setLastShape(tool)
   const inking = tool === 'pen' || tool === 'highlighter'
   const toolLabel: Record<Tool, string> = {
     select: t.toolSelect,
@@ -443,6 +482,25 @@ export function ToolDock({
     sticky: t.toolSticky,
     text: t.toolText,
     frame: t.toolFrame,
+    ellipse: t.toolEllipse,
+    diamond: t.toolDiamond,
+    line: t.toolLine,
+    arrow: t.toolArrow,
+    image: t.toolImage,
+  }
+  const words = useMemo(
+    () => Object.fromEntries(Object.entries(t).filter(([, v]) => typeof v === 'string')) as Record<string, string>,
+    [t],
+  )
+  const templateTitle: Record<TemplateId, string> = {
+    kanban: t.tplKanban,
+    timeline: t.tplTimeline,
+    retro: t.tplRetro,
+    mindmap: t.tplMindmap,
+    flowchart: t.tplFlowchart,
+    architecture: t.tplArchitecture,
+    storymap: t.tplStorymap,
+    sprint: t.tplSprint,
   }
   const weightLabel: Record<number, string> = {
     300: t.weightLight,
@@ -453,6 +511,69 @@ export function ToolDock({
 
   return (
     <div className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+      {flyout && (
+        <div className="glass mb-2 flex w-fit items-center gap-1 rounded-xl p-1.5">
+          {TOOLS.filter((entry) => SHAPES.includes(entry.id)).map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              title={`${toolLabel[entry.id]} (${entry.key})`}
+              // Not the dock button's own label, or two buttons answer to one name.
+              aria-label={t.shapeOption(toolLabel[entry.id])}
+              aria-pressed={tool === entry.id}
+              onClick={() => {
+                setFlyout(false)
+                onTool(entry.id)
+              }}
+              className={`grid size-9 place-items-center rounded-lg ${tool === entry.id ? 'bg-accent/12' : 'hover:bg-canvas'}`}
+            >
+              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                {entry.path}
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {templates && (
+        <div className="glass mb-2 w-fit rounded-xl p-2">
+          <div className="mb-2 flex gap-1" role="group" aria-label={t.templates}>
+            {(['planning', 'software'] as const).map((group) => (
+              <button
+                key={group}
+                type="button"
+                aria-pressed={tab === group}
+                onClick={() => setTab(group)}
+                className={`rounded-lg px-3 py-1 text-sm font-semibold ${tab === group ? 'bg-accent/12 text-accent-ink' : 'text-muted hover:bg-canvas'}`}
+              >
+                {group === 'planning' ? t.planning : t.software}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {TEMPLATES.filter((tpl) => tpl.group === tab).map((tpl) => {
+              const title = templateTitle[tpl.id]
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  title={title}
+                  aria-label={title}
+                  onClick={() => {
+                    setTemplates(false)
+                    onTemplate(tpl.id, title)
+                  }}
+                  className="grid place-items-center gap-1 rounded-lg p-1.5 hover:bg-canvas"
+                >
+                  <TemplatePreview id={tpl.id} words={words} />
+                  <span className="text-xs font-semibold">{title}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {palette && (
         <div className="glass mb-2 grid grid-cols-6 gap-1.5 rounded-xl p-2">
           {SWATCHES.map((swatch) => (
@@ -506,7 +627,7 @@ export function ToolDock({
                 aria-pressed={weight === value}
                 onClick={() => onWeight(value)}
                 className={`grid h-8 min-w-9 place-items-center rounded-lg px-1.5 text-[15px] ${
-                  weight === value ? 'bg-accent/12 text-accent' : 'text-ink hover:bg-canvas'
+                  weight === value ? 'bg-accent/12 text-accent-ink' : 'text-ink hover:bg-canvas'
                 }`}
                 style={{ fontWeight: value }}
               >
@@ -517,33 +638,78 @@ export function ToolDock({
       )}
 
       <div className="glass flex items-center gap-0.5 rounded-2xl px-2 py-1.5">
-        {TOOLS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            title={`${toolLabel[entry.id]} (${entry.key})`}
-            aria-label={toolLabel[entry.id]}
-            aria-pressed={tool === entry.id}
-            onClick={() => onTool(entry.id)}
-            className={`grid size-10 place-items-center rounded-xl transition-colors ${
-              tool === entry.id ? 'bg-accent/12 text-accent' : 'text-muted hover:bg-canvas'
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="size-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {entry.path}
-            </svg>
-          </button>
-        ))}
+        {TOOLS.filter((base) => base.id !== 'ellipse' && base.id !== 'diamond').map((base) => {
+          // The shape slot stands for all three shapes.
+          const entry = base.id === 'shape' ? (TOOLS.find((e) => e.id === lastShape) ?? base) : base
+          const on = base.id === 'shape' ? SHAPES.includes(tool) : tool === entry.id
+          return (
+            <Fragment key={base.id}>
+              <button
+                type="button"
+                title={`${toolLabel[entry.id]} (${entry.key})`}
+                aria-label={toolLabel[entry.id]}
+                aria-pressed={on}
+                onClick={() => {
+                  setFlyout(false)
+                  onTool(entry.id)
+                }}
+                className={`grid size-10 place-items-center rounded-xl transition-colors ${
+                  on ? '' : 'text-muted hover:bg-canvas'
+                }`}
+                style={
+                  on
+                    ? {
+                        background: PALETTE[TOOL_INK[entry.id]].line,
+                        // `line` on slate is dark, so its icon is white rather than `deep`.
+                        color: entry.id === 'select' ? '#fff' : PALETTE[TOOL_INK[entry.id]].deep,
+                      }
+                    : undefined
+                }
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {entry.path}
+                </svg>
+              </button>
+              {base.id === 'shape' && (
+                <button
+                  type="button"
+                  title={t.moreShapes}
+                  aria-label={t.moreShapes}
+                  aria-expanded={flyout}
+                  onClick={() => setFlyout((open) => !open)}
+                  className="-ml-0.5 grid h-10 w-4 place-items-center rounded-lg text-muted hover:bg-canvas"
+                >
+                  <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 15l6-6 6 6" />
+                  </svg>
+                </button>
+              )}
+            </Fragment>
+          )
+        })}
 
         <span className="mx-1 h-6 w-px bg-line" />
+
+        <button
+          type="button"
+          title={t.templates}
+          aria-label={t.templates}
+          aria-expanded={templates}
+          onClick={() => setTemplates((open) => !open)}
+          className={`grid size-10 place-items-center rounded-xl ${templates ? 'bg-accent/12' : 'text-muted hover:bg-canvas'}`}
+        >
+          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h6v6H4V4ZM14 4h6v6h-6V4ZM4 14h6v6H4v-6ZM17 14v6M14 17h6" />
+          </svg>
+        </button>
 
         <button
           type="button"
@@ -560,6 +726,46 @@ export function ToolDock({
         </button>
       </div>
     </div>
+  )
+}
+
+/** A template drawn small: its drafts as plain outlines, scaled to 160x100. */
+function TemplatePreview({ id, words }: { id: TemplateId; words: Record<string, string> }) {
+  const rows = useMemo(() => {
+    let n = 0
+    const tpl = TEMPLATES.find((entry) => entry.id === id)
+    return resolveRefs(tpl ? tpl.build(words, { x: 0, y: 0 }) : [], () => `p${n++}`)
+  }, [id, words])
+  const solid = rows.filter((r) => r.kind !== 'text')
+  const minX = Math.min(...solid.map((r) => r.x))
+  const minY = Math.min(...solid.map((r) => r.y))
+  const maxX = Math.max(...solid.map((r) => r.x + r.w))
+  const maxY = Math.max(...solid.map((r) => r.y + r.h))
+  const pad = 24
+  return (
+    <svg
+      viewBox={`${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`}
+      width={160}
+      height={100}
+      aria-hidden="true"
+      className="rounded-md border border-line bg-canvas"
+    >
+      {solid.map((r) => {
+        const ink = PALETTE[r.color] ?? PALETTE.slate
+        if (r.kind === 'connector') {
+          const [x1, y1, x2, y2] = r.points ?? [0, 0, 0, 0]
+          return <line key={r.id} x1={x1} y1={y1} x2={x2} y2={y2} stroke={PALETTE.slate.line} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        }
+        const common = { fill: r.kind === 'frame' ? 'none' : ink.tint, stroke: r.kind === 'frame' ? PALETTE.slate.line : ink.line, strokeWidth: 1.5, vectorEffect: 'non-scaling-stroke' as const }
+        if (r.shape === 'ellipse') return <ellipse key={r.id} {...common} cx={r.x + r.w / 2} cy={r.y + r.h / 2} rx={r.w / 2} ry={r.h / 2} />
+        if (r.shape === 'diamond') {
+          const cx = r.x + r.w / 2
+          const cy = r.y + r.h / 2
+          return <polygon key={r.id} {...common} points={`${cx},${r.y} ${r.x + r.w},${cy} ${cx},${r.y + r.h} ${r.x},${cy}`} />
+        }
+        return <rect key={r.id} {...common} x={r.x} y={r.y} width={r.w} height={r.h} />
+      })}
+    </svg>
   )
 }
 
@@ -1083,7 +1289,7 @@ function Tiny({
         event.stopPropagation()
         onClick()
       }}
-      className={`grid size-5 place-items-center rounded ${on ? 'text-accent' : 'text-muted'} hover:bg-canvas hover:text-ink`}
+      className={`grid size-5 place-items-center rounded ${on ? 'text-accent-ink' : 'text-muted'} hover:bg-canvas hover:text-ink`}
     >
       <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         {children}
@@ -1102,7 +1308,11 @@ function kindName(kind: Item['kind'], lang: Lang) {
         ? t.kindText
         : kind === 'frame'
           ? t.kindFrame
-          : t.kindStroke
+          : kind === 'connector'
+            ? t.kindConnector
+            : kind === 'image'
+              ? t.kindImage
+              : t.kindStroke
 }
 
 function Dot({ color, initials }: { color: string; initials: string }) {
@@ -1137,7 +1347,7 @@ function RailButton({
       aria-label={label}
       aria-pressed={active}
       className={`grid w-10 place-items-center rounded-lg py-1.5 ${
-        active ? 'bg-accent/12 text-accent' : 'text-muted hover:bg-panel/70'
+        active ? 'bg-accent/12 text-accent-ink' : 'text-muted hover:bg-panel/70'
       }`}
     >
       <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">

@@ -13,3 +13,20 @@ class_name = "Room"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+# Pictures. The bucket has to exist first: `npx wrangler r2 bucket create whiteboard-images`.
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "whiteboard-images"
+
+# Pages allowed to upload, comma-separated. localhost is the dev default in code.
+[vars]
+SITE_ORIGINS = "https://whiteboard.chakkritton.com"
+
+# Five uploads per IP per minute. The binding only takes a period of 10 or 60
+# seconds, so this stands in for the 20 per 10 minutes the Node server allows.
+[[ratelimits]]
+name = "UPLOADS"
+# 1001 belongs to the mr-worldwide worker; ids are account-wide.
+namespace_id = "1002"
+simple = { limit = 5, period = 60 }

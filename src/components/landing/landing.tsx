@@ -87,7 +87,7 @@ export function Landing({ lang }: { lang: Lang }) {
 
         <main className="mx-auto max-w-5xl px-6 pb-24">
           <section className="pt-10 pb-16 sm:pt-16">
-            <h1 className="max-w-3xl text-4xl leading-[1.15] font-extrabold tracking-tight text-balance sm:text-6xl">
+            <h1 className="font-hand max-w-3xl text-4xl leading-[1.15] font-extrabold tracking-tight text-balance sm:text-6xl">
               {t.tagline}
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">{t.heroBody}</p>
@@ -104,7 +104,7 @@ export function Landing({ lang }: { lang: Lang }) {
             <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {t.features.map((feature, i) => (
                 <li key={feature.title} className="glass rounded-2xl p-5">
-                  <span className="grid size-10 place-items-center rounded-xl bg-accent/12 text-accent">
+                  <span className="grid size-10 place-items-center rounded-xl bg-accent/12 text-accent-ink">
                     <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       {ICONS[i]}
                     </svg>

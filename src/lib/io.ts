@@ -2,7 +2,9 @@
 
 import { jpegToPdf } from './pdf'
 import { toCanvas, type PictureFormat } from './picture'
-import type { BoardFile, Item } from './types'
+import { PALETTE } from './palette'
+import { KEY_RE } from './image-rules'
+import type { BoardFile, Item, ItemKind } from './types'
 
 /**
  * Reading and writing a board as a file.
@@ -63,7 +65,9 @@ function encode(canvas: HTMLCanvasElement, type: string, quality?: number) {
 export async function downloadPicture(items: Item[], title: string, format: PictureFormat) {
   if (!items.length) throw new EmptyBoard()
 
-  const { canvas, scale } = toCanvas(items, 2)
+  // Thai text drawn before the hand font has loaded falls back halfway through.
+  await document.fonts.ready
+  const { canvas, scale } = await toCanvas(items, 2)
 
   if (format === 'png') {
     save(await encode(canvas, 'image/png'), `${slug(title)}.png`)
@@ -159,14 +163,48 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+const KINDS: ItemKind[] = ['sticky', 'frame', 'text', 'shape', 'comment', 'stroke', 'connector', 'image']
+
 function isItem(value: unknown): value is Item {
   if (!isRecord(value)) return false
   const numbers = ['x', 'y', 'w', 'h', 'z'] as const
+  // Optional fields must be right if present: a peer or a file can say anything.
+  const shapeOk = value.shape === undefined || ['rect', 'ellipse', 'diamond'].includes(value.shape as string)
+  const headOk = value.head === undefined || value.head === 'end' || value.head === 'none'
+  const idsOk = [value.from, value.to].every((id) => id === undefined || typeof id === 'string')
+  const endsOk =
+    value.kind !== 'connector' ||
+    (Array.isArray(value.points) &&
+      value.points.length === 4 &&
+      value.points.every((n) => typeof n === 'number' && Number.isFinite(n)))
+  const pressureOk =
+    value.pressure === undefined ||
+    (Array.isArray(value.pressure) &&
+      Array.isArray(value.points) &&
+      value.pressure.length === value.points.length / 2 &&
+      value.pressure.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1))
+  // A picture is a reference: without a well-formed key and a usable aspect it
+  // would request a path of somebody else's choosing, or be laid out at NaN.
+  const imageOk =
+    value.kind !== 'image' ||
+    (typeof value.src === 'string' &&
+      KEY_RE.test(value.src) &&
+      typeof value.aspect === 'number' &&
+      Number.isFinite(value.aspect) &&
+      value.aspect > 0)
   return (
+    imageOk &&
+    pressureOk &&
+    shapeOk &&
+    headOk &&
+    idsOk &&
+    endsOk &&
     typeof value.id === 'string' &&
     typeof value.kind === 'string' &&
+    KINDS.includes(value.kind as ItemKind) &&
     typeof value.text === 'string' &&
     typeof value.color === 'string' &&
+    Object.hasOwn(PALETTE, value.color) &&
     numbers.every((key) => typeof value[key] === 'number' && Number.isFinite(value[key]))
   )
 }

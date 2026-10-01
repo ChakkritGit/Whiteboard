@@ -6,66 +6,42 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme {
-  --color-canvas: #f4f2ee;
-  --color-panel: #ffffff;
-  --color-ink: #1f2430;
-  --color-muted: #6b7280;
-  --color-line: #e5e3df;
-  --color-accent: #6366f1;
+  --color-canvas: #f7f1e3;
+  --color-panel: #fffdf7;
+  --color-ink: #1b1b3a;
+  --color-muted: #6e6a80;
+  --color-line: #e6dcc8;
+  --color-accent: #ff48b0;
+  --color-accent-ink: #b0005f;
 }
 
 /**
  * The two themes, as the same six names with different values.
  *
- * Everything downstream — Tailwind's `bg-panel`, the glass, the paper, the ink
+ * Everything downstream — Tailwind's `bg-panel`, the cards, the paper, the ink
  * inside a note — reads these, so a theme swap is this block and nothing else.
  * `data-theme` is always written, by a script in the head before the first
  * paint, so there is no flash of the wrong one and no media query to keep in
  * step with the stored preference.
  */
 :root {
-  --paper-dot: rgb(31 36 48 / 0.07);
-  --paper-dot-soft: rgb(31 36 48 / 0.05);
-  /**
-   * Thin fill, moderate blur.
-   *
-   * The fill is as low as it goes while the panel's own text still reads. The
-   * blur is *not* pushed to match, and that is deliberate: past roughly twenty
-   * pixels on a panel this size Chrome stops filtering the backdrop at all —
-   * not a smaller blur, none — and every panel goes from glass to flat tinted
-   * plastic with a hard edge. Raising this number is the one change here that
-   * can silently remove the effect it is meant to strengthen, so if the glass
-   * ever looks like plastic again, look here first.
-   */
-  --glass-fill: rgb(255 255 255 / 0.26);
-  --glass-filter: blur(16px) saturate(220%) brightness(1.08);
-  --glass-edge: rgb(255 255 255 / 0.5);
-  --glass-sheen: rgb(255 255 255 / 0.5);
-  --glass-rim: rgb(255 255 255 / 1);
-  --glass-rim-soft: rgb(255 255 255 / 0.32);
-  --glass-shadow: 16 24 40;
-  --glass-shadow-strength: 0.09;
-  /* How thick the pane reads as being: the band the light bends in. */
+  --paper-dot: rgb(27 27 58 / 0.07);
+  --paper-dot-soft: rgb(27 27 58 / 0.05);
+  --card-shadow: rgb(27 27 58 / 0.85);
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --color-canvas: #14161b;
-  --color-panel: #1c1f27;
-  --color-ink: #e9ebf1;
-  --color-muted: #9aa2b1;
-  --color-line: #2b2f3a;
-  --color-accent: #818cf8;
+  --color-canvas: #141a33;
+  --color-panel: #1c2347;
+  --color-ink: #f7f1e3;
+  --color-muted: #a9a6c2;
+  --color-line: #2e3763;
+  --color-accent: #ff6bc1;
+  --color-accent-ink: #ff8fd0;
+  --card-shadow: color-mix(in oklab, var(--color-accent) 60%, transparent);
   --paper-dot: rgb(255 255 255 / 0.09);
   --paper-dot-soft: rgb(255 255 255 / 0.06);
-  --glass-fill: rgb(28 31 40 / 0.32);
-  --glass-filter: blur(18px) saturate(190%) brightness(1.16);
-  --glass-edge: rgb(255 255 255 / 0.1);
-  --glass-sheen: rgb(255 255 255 / 0.14);
-  --glass-rim: rgb(255 255 255 / 0.5);
-  --glass-rim-soft: rgb(255 255 255 / 0.08);
-  --glass-shadow: 0 0 0;
-  --glass-shadow-strength: 0.5;
   color-scheme: dark;
 }
 
@@ -145,107 +121,101 @@ textarea,
       radial-gradient(circle, var(--paper-dot-soft) 1px, transparent 1px);
   }
 
-  /**
-   * Glass, in the way the phone means it.
-   *
-   * A blurred backdrop on its own is frosted plastic. What reads as glass is the
-   * edge: light gathering along the rim, brightest where it faces the light and
-   * fading round the other side, over a fill thin enough that the colour of what
-   * is behind still comes through. So this is three layers, and needs all three.
-   *
-   *   the element   blur, saturation and a lift of brightness — the body of it
-   *   ::before      the sheen, a soft highlight across the top, under the content
-   *   ::after       the rim, a one-pixel gradient border, over everything
-   *
-   * The rim is a gradient painted into a one-pixel ring by masking out the middle,
-   * which is the only way to have a border whose colour changes along its length.
-   * `-webkit-` on the mask and the backdrop filter is still load-bearing: Safari
-   * has unprefixed neither.
-   */
+  /* A printed Riso card: flat paper, an ink border, a hard offset shadow.
+     No backdrop filter, so nothing here can silently stop working. */
   .glass {
     position: relative;
-    isolation: isolate;
-    /* A flat colour, with the sheen back on its own layer below the content.
-       Painting the sheen into this shorthand as two gradients cost the blur:
-       Chromium stopped filtering the backdrop of these panels entirely, and
-       every one of them went from glass to tinted plastic. */
-    background: var(--glass-fill);
-    -webkit-backdrop-filter: var(--glass-filter);
-    backdrop-filter: var(--glass-filter);
-    border: 1px solid var(--glass-edge);
-    box-shadow:
-      0 1px 2px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.55)),
-      0 8px 20px rgb(var(--glass-shadow) / var(--glass-shadow-strength)),
-      0 24px 48px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.8));
+    background: var(--color-panel);
+    border: 1.5px solid var(--color-ink);
+    box-shadow: 3px 3px 0 var(--card-shadow);
   }
 
-  /* The sheen: a soft highlight across the top, under the content. `z-index:-1`
-     puts it above the panel's own background and below everything in it, which
-     is exactly where a reflection sits. */
-  .glass::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      radial-gradient(120% 90% at 18% -20%, var(--glass-sheen), transparent 62%),
-      linear-gradient(180deg, var(--glass-sheen), transparent 45%);
-    opacity: 0.85;
-  }
-
-  .glass::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    pointer-events: none;
-    background: linear-gradient(
-      145deg,
-      var(--glass-rim),
-      var(--glass-rim-soft) 28%,
-      transparent 52%,
-      var(--glass-rim-soft) 76%,
-      var(--glass-rim)
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-  }
-
-  /**
-   * Panels anchored to an edge of the screen: the top bar, the rail.
-   *
-   * They lose the shadow on the side they meet, and they lose both the sheen and
-   * the rim entirely. Those two are drawn per panel and start over at each
-   * panel's own top-left corner, so where the rail meets the bar underneath it
-   * you got a bright line from the bar's rim, a second from the rail's, and a
-   * fresh highlight down the rail that made it read as a lighter, separate
-   * surface. Anchored chrome should look like one continuous pane; the 1px
-   * `border` on the meeting side is the whole of the join it needs.
-   */
-  .glass-flat::before,
-  .glass-flat::after {
-    content: none;
-  }
-
+  /* Panels on a screen edge keep their border sides from the markup, no shadow. */
   .glass-flat {
-    box-shadow: 0 1px 2px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.5)),
-      0 8px 20px rgb(var(--glass-shadow) / calc(var(--glass-shadow-strength) * 0.7));
+    box-shadow: none;
+  }
+
+  /* A picture on its way up: a Riso card with a stripe that crawls. The tile is
+     one stripe period wide (16px along the diagonal is 22.63px across), so the
+     loop has no seam. */
+  .upload-card {
+    background-color: var(--color-panel);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--color-accent) 28%, transparent) 0 8px,
+      transparent 8px 16px
+    );
+    background-size: 22.63px 22.63px;
+    border: 1.5px solid var(--color-ink);
+    box-shadow: 3px 3px 0 var(--card-shadow);
+    animation: upload-stripe 0.8s linear infinite;
+  }
+  @keyframes upload-stripe {
+    to {
+      background-position: 22.63px 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .upload-card {
+      animation: none;
+    }
   }
 
   /* A note being dragged should feel picked up. */
   .lifted {
-    box-shadow:
-      0 12px 24px rgb(16 24 40 / 0.18),
-      0 2px 6px rgb(16 24 40 / 0.12);
+    box-shadow: 5px 5px 0 var(--card-shadow);
+  }
+
+  /* Mr. Worldwide. Nothing moves unless a state asks it to, and nothing at all
+     under reduced motion. */
+  .gl svg {
+    overflow: visible;
+  }
+  .gl-eyes,
+  .gl-lat {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .gl[data-state='idle'] .gl-eyes,
+  .gl[data-state='done'] .gl-eyes {
+    animation: gl-blink 7s ease-in-out 3s infinite;
+  }
+  .gl[data-state='thinking'] .gl-lat {
+    animation: gl-slide 2s ease-in-out infinite;
+  }
+  .gl[data-state='done'] svg {
+    animation: gl-hop 0.3s ease-out 1;
+  }
+  @keyframes gl-blink {
+    0%,
+    94%,
+    100% {
+      transform: scaleY(1);
+    }
+    97% {
+      transform: scaleY(0.1);
+    }
+  }
+  @keyframes gl-slide {
+    50% {
+      transform: translateY(5px);
+    }
+  }
+  @keyframes gl-hop {
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gl-eyes,
+    .gl-lat,
+    .gl svg {
+      animation: none !important;
+    }
+  }
+
+  .font-hand {
+    font-family: var(--font-hand), ui-sans-serif, system-ui, 'Noto Sans Thai', sans-serif;
   }
 
   /* Text inside a sticky wraps, never spills out of it, and keeps the line breaks

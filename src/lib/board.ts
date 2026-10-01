@@ -8,6 +8,7 @@ import * as awarenessProtocol from 'y-protocols/awareness'
 import { nanoid } from 'nanoid'
 import type { Item, Presence } from './types'
 import { loadMe } from './identity'
+import { resolveRefs, type Draft } from './templates'
 
 /**
  * One board, held as a CRDT.
@@ -44,6 +45,9 @@ export type BoardHandle = {
  * connects, and it says Live.
  */
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:1234'
+
+/** Where pictures are fetched from: the same server as the rooms, over http. */
+export const IMG_BASE = WS_URL.replace(/^ws/, 'http')
 
 /**
  * The document is made during render and the connections in an effect.
@@ -219,13 +223,19 @@ export function addItem(handle: BoardHandle, item: Omit<Item, 'id' | 'z'> & Part
   return id
 }
 
-export function updateItem(handle: BoardHandle, id: string, patch: Partial<Item>) {
+/**
+ * `undefined` in a patch means "leave it", which is what every caller wants but
+ * one: freeing a connector's end has to remove the key, so `clear` names the
+ * keys to delete.
+ */
+export function updateItem(handle: BoardHandle, id: string, patch: Partial<Item>, clear: (keyof Item)[] = []) {
   const entry = handle.items.get(id)
   if (!entry) return
   handle.doc.transact(() => {
     Object.entries(patch).forEach(([key, value]) => {
       if (value !== undefined) entry.set(key, value)
     })
+    clear.forEach((key) => entry.delete(key))
   })
 }
 
@@ -300,6 +310,56 @@ export function nextZ(handle: BoardHandle) {
     top = Math.max(top, (entry.get('z') as number) ?? 0)
   })
   return top + 1
+}
+
+/**
+ * Put a template on the board: new ids, one group, one transaction.
+ *
+ * Frames take the lowest z so what they hold sits on top of them. The group is
+ * written here rather than through `groupItems` so the whole placement is a
+ * single transaction, and so a single undo.
+ */
+export function placeTemplate(handle: BoardHandle, drafts: Draft[], name: string): string[] {
+  const rows = resolveRefs(drafts, () => nanoid(10))
+  if (!rows.length) return []
+  const group = nanoid(8)
+  let z = nextZ(handle)
+  const ordered = [...rows.filter((r) => r.kind === 'frame'), ...rows.filter((r) => r.kind !== 'frame')]
+  handle.doc.transact(() => {
+    handle.groups.set(group, name)
+    for (const row of ordered) {
+      const entry = new Y.Map<unknown>()
+      Object.entries({ ...row, z: z++, group }).forEach(([key, value]) => {
+        if (value !== undefined) entry.set(key, value)
+      })
+      handle.items.set(row.id, entry)
+    }
+  })
+  return rows.map((r) => r.id)
+}
+
+/**
+ * Tidy: new frames and moved notes as one transaction, so one undo takes both back.
+ *
+ * Frames go below everything, as `sendToBack` does, so the notes stay on top of
+ * them. A move for an id that has gone since the answer came back is skipped by
+ * `updateItem`, and nothing here touches an item the caller did not name.
+ */
+export function applyTidy(handle: BoardHandle, frames: Draft[], moves: { id: string; x: number; y: number }[]) {
+  let bottom = 0
+  handle.items.forEach((entry) => {
+    bottom = Math.min(bottom, (entry.get('z') as number) ?? 0)
+  })
+  handle.doc.transact(() => {
+    frames.forEach((frame, i) => {
+      const { ref, from, to, ...rest } = frame
+      void ref
+      void from
+      void to
+      addItem(handle, { ...rest, z: bottom - 1 - (frames.length - 1 - i) })
+    })
+    moves.forEach(({ id, x, y }) => updateItem(handle, id, { x, y }))
+  })
 }
 
 /** Replace the whole board — what an import does. */
