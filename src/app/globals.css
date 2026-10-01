@@ -130,11 +130,6 @@ textarea,
     box-shadow: 3px 3px 0 var(--card-shadow);
   }
 
-  /* Panels on a screen edge keep their border sides from the markup, no shadow. */
-  .glass-flat {
-    box-shadow: none;
-  }
-
   /* A picture on its way up: a Riso card with a stripe that crawls. The tile is
      one stripe period wide (16px along the diagonal is 22.63px across), so the
      loop has no seam. */
@@ -211,6 +206,28 @@ textarea,
     .gl-lat,
     .gl svg {
       animation: none !important;
+    }
+  }
+
+  /* First-open hints. Hidden rather than unmounted so it can fade out; the
+     delay on the way in keeps it from flashing over a board still syncing. */
+  .welcome {
+    transition: opacity 0.3s, visibility 0.3s;
+    animation: welcome-in 0.3s 0.5s both;
+  }
+  .welcome[data-hidden='true'] {
+    opacity: 0;
+    visibility: hidden;
+  }
+  @keyframes welcome-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .welcome {
+      transition: none;
+      animation: none;
     }
   }
 

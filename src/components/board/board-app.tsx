@@ -34,6 +34,7 @@ import { ACCEPT, budgetLeft } from '@/lib/image-rules'
 import { UploadError, pictureFromFile } from '@/lib/upload'
 import { BoardItem, type Corner } from './board-item'
 import { Guide } from '../guide/globe'
+import { Welcome } from './welcome'
 import { ContextMenu, type MenuEntry } from './menu'
 import {
   Cursors,
@@ -119,6 +120,9 @@ export function BoardApp({ room }: { room: string }) {
 
   const surface = useRef<HTMLDivElement>(null)
   const picker = useRef<HTMLInputElement>(null)
+  const importer = useRef<HTMLInputElement>(null)
+  const [templates, setTemplates] = useState(false)
+  const [guide, setGuide] = useState(false)
   const drag = useRef<{ ids: string[]; from: { x: number; y: number }; start: Map<string, { x: number; y: number }> } | null>(null)
   const pan = useRef<{ x: number; y: number; camera: Camera } | null>(null)
   const drawing = useRef<{ id: string; points: number[]; pressure: number[]; real: boolean; sent: number } | null>(null)
@@ -266,14 +270,17 @@ export function BoardApp({ room }: { room: string }) {
       },
       { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
     )
-    const pad = 80
+    // Screen pixels kept clear on every side (the box is centred), so the
+    // floating cards at the top and left and the dock at the bottom never cover it.
+    const marginX = 96
+    const marginY = 110
     const zoom = Math.min(
       MAX_ZOOM,
       Math.max(
         MIN_ZOOM,
         Math.min(
-          viewport.w / Math.max(1, box.maxX - box.minX + pad * 2),
-          viewport.h / Math.max(1, box.maxY - box.minY + pad * 2),
+          (viewport.w - marginX * 2) / Math.max(1, box.maxX - box.minX),
+          (viewport.h - marginY * 2) / Math.max(1, box.maxY - box.minY),
         ),
       ),
     )
@@ -1419,7 +1426,7 @@ export function BoardApp({ room }: { room: string }) {
         history={history}
         onReset={() => setCamera({ x: 0, y: 0, zoom: 1 })}
         onExport={onExport}
-        onImport={onImport}
+        onImport={() => importer.current?.click()}
         onShare={onShare}
         shared={shared}
         mounted={mounted}
@@ -1578,6 +1585,26 @@ export function BoardApp({ room }: { room: string }) {
         onWeight={applyWeight}
         showType={showType}
         onTemplate={addTemplate}
+        templates={templates}
+        onTemplates={setTemplates}
+      />
+      <input
+        ref={importer}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(event) => {
+          const chosen = event.target.files?.[0]
+          if (chosen) void onImport(chosen)
+          // Cleared so choosing the same file twice fires again.
+          event.target.value = ''
+        }}
+      />
+      <Welcome
+        empty={items.length === 0}
+        onTemplates={() => setTemplates(true)}
+        onGuide={() => setGuide(true)}
+        onFile={() => importer.current?.click()}
       />
       <input
         ref={picker}
@@ -1592,7 +1619,7 @@ export function BoardApp({ room }: { room: string }) {
         }}
       />
       <MiniMap items={items} camera={camera} viewport={viewport} />
-      <Guide board={board} items={items} camera={camera} viewport={viewport} history={history} select={setSelection} />
+      <Guide board={board} items={items} camera={camera} viewport={viewport} history={history} select={setSelection} open={guide} onOpen={setGuide} />
       {menu && <ContextMenu at={menu} entries={entries} onClose={() => setMenu(null)} />}
       <Toast message={toast} onDone={() => setToast(null)} />
     </main>

@@ -62,6 +62,8 @@ export function Guide({
   viewport,
   history,
   select,
+  open,
+  onOpen,
 }: {
   board: BoardHandle
   items: Item[]
@@ -69,10 +71,13 @@ export function Guide({
   viewport: { w: number; h: number }
   history: ReturnType<typeof useHistory>
   select: (ids: string[]) => void
+  /** Owned by the board so the welcome can open the guide too. */
+  open: boolean
+  onOpen: (open: boolean) => void
 }) {
   const { t } = useLang()
-  const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  if (open && !loaded) setLoaded(true)
   const [state, setState] = useState<GlobeState>('idle')
 
   return (
@@ -80,7 +85,7 @@ export function Guide({
       {loaded && (
         <GuidePanel
           open={open}
-          onClose={() => setOpen(false)}
+          onClose={() => onOpen(false)}
           onState={setState}
           board={board}
           items={items}
@@ -94,10 +99,7 @@ export function Guide({
         type="button"
         aria-label={`${t.guideName} (${open ? t.guideCloseWord : t.guideOpenWord})`}
         aria-expanded={open}
-        onClick={() => {
-          setLoaded(true)
-          setOpen((o) => !o)
-        }}
+        onClick={() => onOpen(!open)}
         className="absolute right-4 bottom-[188px] z-30 h-14 w-14 cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <Globe state={state} />

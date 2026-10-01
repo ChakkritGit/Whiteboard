@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE, SWATCHES } from '@/lib/palette'
 import { WS_URL } from '@/lib/board'
@@ -45,20 +45,21 @@ export function TopBar({
   onReset: () => void
   history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void }
   onExport: (format: ExportFormat) => void
-  onImport: (file: File) => void
+  /** Opens the file chooser; the input lives in the board, which the welcome also uses. */
+  onImport: () => void
   onShare: () => void
   shared: boolean
   /** False during the server render; see the avatar row. */
   mounted: boolean
 }) {
   const { t } = useLang()
-  const file = useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = useState(false)
   const everyone = [{ initials: me.initials, color: me.color, name: me.name }, ...peers]
   const shown = everyone.slice(0, 4)
 
   return (
-    <header className="glass glass-flat pointer-events-auto absolute inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-x-0 border-t-0 px-3">
+    <header className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-start justify-between gap-2">
+      <div className="glass pointer-events-auto flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-2 py-1">
       <Logo size={30} />
 
       <input
@@ -68,8 +69,9 @@ export function TopBar({
         aria-label={t.boardTitle}
         className="font-hand min-w-0 max-w-[18rem] flex-1 rounded-md px-2 py-1 text-[15px] font-semibold outline-none hover:bg-canvas focus:bg-canvas sm:flex-none"
       />
+      </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="glass pointer-events-auto flex min-h-11 shrink-0 flex-wrap items-center justify-end gap-1.5 rounded-xl px-2 py-1">
         <span
           title={live ? t.connectedTo(WS_URL) : t.notConnectedTo(WS_URL)}
           className={`hidden cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
@@ -197,21 +199,9 @@ export function TopBar({
           )}
         </div>
 
-        <IconButton label={t.importBoard} onClick={() => file.current?.click()}>
+        <IconButton label={t.importBoard} onClick={onImport}>
           <path d="M12 20V9M8 13l4-4 4 4M5 4h14" />
         </IconButton>
-        <input
-          ref={file}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(event) => {
-            const chosen = event.target.files?.[0]
-            if (chosen) onImport(chosen)
-            // Cleared so choosing the same file twice fires again.
-            event.target.value = ''
-          }}
-        />
 
         <button
           type="button"
@@ -409,7 +399,7 @@ const TOOL_INK: Record<Tool, Swatch> = {
   image: 'sky',
 }
 
-const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
+export const TOOLS: { id: Tool; key: string; path: React.ReactNode }[] = [
   { id: 'select', key: 'V', path: <path d="M6 3l13 8-6 1.5L10 19 6 3Z" /> },
   { id: 'pen', key: 'P', path: <path d="M4 20l4-1 10-10-3-3L5 16l-1 4ZM14 6l3 3" /> },
   {
@@ -451,6 +441,8 @@ export function ToolDock({
   onWeight,
   showType,
   onTemplate,
+  templates,
+  onTemplates,
 }: {
   tool: Tool
   onTool: (next: Tool) => void
@@ -463,10 +455,11 @@ export function ToolDock({
   /** Whether anything the type controls apply to is in play. */
   showType: boolean
   onTemplate: (id: TemplateId, name: string) => void
+  templates: boolean
+  onTemplates: (open: boolean) => void
 }) {
   const { t } = useLang()
   const [palette, setPalette] = useState(false)
-  const [templates, setTemplates] = useState(false)
   const [tab, setTab] = useState<'planning' | 'software'>('planning')
   const [flyout, setFlyout] = useState(false)
   // The shape button shows whichever shape was used last, so one click repeats it.
@@ -536,7 +529,7 @@ export function ToolDock({
                   title={title}
                   aria-label={title}
                   onClick={() => {
-                    setTemplates(false)
+                    onTemplates(false)
                     onTemplate(tpl.id, title)
                   }}
                   className="grid place-items-center gap-1 rounded-lg p-1.5 hover:bg-canvas"
@@ -705,7 +698,7 @@ export function ToolDock({
           title={t.templates}
           aria-label={t.templates}
           aria-expanded={templates}
-          onClick={() => setTemplates((open) => !open)}
+          onClick={() => onTemplates(!templates)}
           className={`grid size-10 place-items-center rounded-xl ${templates ? 'bg-accent/12' : 'text-muted hover:bg-canvas'}`}
         >
           <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -961,7 +954,7 @@ export function LeftRail({
 
   return (
     <>
-      <aside className="glass glass-flat pointer-events-auto absolute top-14 bottom-0 left-0 z-20 flex w-12 flex-col items-center gap-1 border-y-0 border-l-0 py-3">
+      <aside className="glass pointer-events-auto absolute top-1/2 left-3 z-20 flex -translate-y-1/2 flex-col items-center gap-1 rounded-xl p-1.5">
         <RailButton
           label={t.people}
           count={people.length + 1}
@@ -981,7 +974,7 @@ export function LeftRail({
       </aside>
 
       {open && (
-        <div className="glass pointer-events-auto absolute top-16 bottom-4 left-14 z-20 flex w-64 flex-col rounded-xl">
+        <div className="glass pointer-events-auto absolute top-1/2 left-[68px] z-20 flex max-h-[calc(100vh-140px)] w-64 -translate-y-1/2 flex-col rounded-xl">
           <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold tracking-wide text-muted uppercase">
             {open === 'people' ? t.inThisRoom : t.onTheBoard}
           </p>
