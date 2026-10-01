@@ -6,8 +6,7 @@ import { PALETTE } from '@/lib/palette'
 import { FRAME_DASH, SKETCH, linePaths, seedOf, shapePaths, type SketchKind, type SketchShape } from '@/lib/sketch'
 import { inkPath } from '@/lib/ink'
 import { useLang } from '@/lib/i18n'
-import { IMG_BASE } from '@/lib/board'
-import { KEY_RE } from '@/lib/image-rules'
+import { isPictureSrc } from '@/lib/image-rules'
 
 /**
  * One thing on the board.
@@ -397,9 +396,9 @@ function Picture({
   onResize?: (corner: Corner, event: React.PointerEvent) => void
   onRotate?: (event: React.PointerEvent) => void
 }) {
-  // Which key failed, not a flag: a different key gets its own chance.
+  // Which src failed, not a flag: a different one gets its own chance.
   const [failed, setFailed] = useState<string | null>(null)
-  const broken = !item.src || !KEY_RE.test(item.src) || failed === item.src
+  const broken = !isPictureSrc(item.src) || failed === item.src
   return (
     <div className={`absolute ${ring}`} style={box} {...hooks}>
       {broken ? (
@@ -417,7 +416,7 @@ function Picture({
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`${IMG_BASE}/img/${item.src}`}
+          src={item.src}
           alt=""
           draggable={false}
           loading="lazy"

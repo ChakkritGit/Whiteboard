@@ -46,9 +46,6 @@ export type BoardHandle = {
  */
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:1234'
 
-/** Where pictures are fetched from: the same server as the rooms, over http. */
-export const IMG_BASE = WS_URL.replace(/^ws/, 'http')
-
 /**
  * The document is made during render and the connections in an effect.
  *

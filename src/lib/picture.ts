@@ -1,8 +1,7 @@
 'use client'
 
 import { PALETTE } from './palette'
-import { IMG_BASE } from './board'
-import { KEY_RE } from './image-rules'
+import { isPictureSrc } from './image-rules'
 import { connectorEnds } from './geometry'
 import { inkPath } from './ink'
 import { FRAME_DASH, SKETCH, linePaths, seedOf, shapePaths, type SketchKind } from './sketch'
@@ -345,17 +344,16 @@ function scaleFor(bounds: Bounds, want: number) {
 /**
  * Every picture the board uses, loaded for drawing. One that fails to load is
  * `null` and is drawn as the placeholder: a missing file must not stop an export.
- * Loaded with `crossOrigin` so the canvas is not tainted and can still be encoded;
- * the image server sends the header that allows it.
+ * A data URL needs no CORS, so the canvas is not tainted. Only a `src` that
+ * passes `isPictureSrc` is loaded: a peer wrote the rest.
  */
 async function loadPictures(items: Item[]) {
-  const keys = new Set(items.flatMap((i) => (i.kind === 'image' && i.src && KEY_RE.test(i.src) ? [i.src] : [])))
+  const keys = new Set(items.flatMap((i) => (i.kind === 'image' && isPictureSrc(i.src) ? [i.src] : [])))
   const loaded = new Map<string, HTMLImageElement | null>()
   await Promise.all(
     [...keys].map(async (key) => {
       const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.src = `${IMG_BASE}/img/${key}`
+      img.src = key
       try {
         await img.decode()
         loaded.set(key, img)

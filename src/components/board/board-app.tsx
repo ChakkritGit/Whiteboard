@@ -30,7 +30,8 @@ import { useLang } from '@/lib/i18n'
 import { BadFile, EmptyBoard, download, downloadPicture, readFile } from '@/lib/io'
 import { inkPath } from '@/lib/ink'
 import { TEMPLATES, type TemplateId } from '@/lib/templates'
-import { UploadError, uploadImage } from '@/lib/upload'
+import { ACCEPT, budgetLeft } from '@/lib/image-rules'
+import { UploadError, pictureFromFile } from '@/lib/upload'
 import { BoardItem, type Corner } from './board-item'
 import { Guide } from '../guide/globe'
 import { ContextMenu, type MenuEntry } from './menu'
@@ -466,31 +467,34 @@ export function BoardApp({ room }: { room: string }) {
   )
 
   /**
-   * Upload a picture and put it on the board, centred on a point.
+   * Shrink a picture and put it on the board, centred on a point.
    *
-   * Nothing goes into the document until the file is stored: a peer would
-   * otherwise get an item whose picture does not exist yet. A card stands in
-   * meanwhile, in this tab only.
+   * Nothing goes into the document until the picture is ready and fits the
+   * board's budget. A card stands in meanwhile, in this tab only, since
+   * shrinking can take a moment on a phone.
    */
   const place = useCallback(
     async (file: File, at: { x: number; y: number }) => {
       const token = crypto.randomUUID()
       setUploading((now) => [...now, { id: token, x: at.x, y: at.y, name: file.name }])
       try {
-        const { key, aspect, width } = await uploadImage(file)
+        const { src, aspect, width } = await pictureFromFile(file)
+        // Read at this moment, after the shrink: a drop of several files must not
+        // each see the same budget. The whole doc reaches a joining client in one
+        // message of at most 1MB, so the pictures on a board share it.
+        if (budgetLeft(latest.current.items) < src.length) throw new UploadError('boardFull')
         const w = Math.min(480, Math.max(MIN_W, width))
         const h = w / aspect
-        const id = addItem(board, { kind: 'image', src: key, aspect, x: at.x - w / 2, y: at.y - h / 2, w, h, text: '', color: 'slate' })
+        const id = addItem(board, { kind: 'image', src, aspect, x: at.x - w / 2, y: at.y - h / 2, w, h, text: '', color: 'slate' })
         history.seal()
         setSelection([id])
       } catch (error) {
         const said = {
           tooBig: t.imgTooBig,
           wrongType: t.imgWrongType,
-          tooMany: t.imgTooMany,
-          offline: t.imgOffline,
+          boardFull: t.imgBoardFull,
         }
-        setToast(error instanceof UploadError ? said[error.code] : t.imgOffline)
+        setToast(error instanceof UploadError ? said[error.code] : t.imgWrongType)
       } finally {
         setUploading((now) => now.filter((entry) => entry.id !== token))
       }
@@ -1342,7 +1346,8 @@ export function BoardApp({ room }: { room: string }) {
       const { items: incoming, title: name, groups: folders } = await readFile(file)
       replaceAll(board, incoming, name, folders)
       setSelection([])
-      setToast(t.loaded(incoming.length, file.name))
+      // A local board is fine at any size; the warning is about sharing it.
+      setToast(budgetLeft(incoming) < 0 ? t.bigBoard : t.loaded(incoming.length, file.name))
       // Fitting after the state has come back round, so it measures the new board.
       setTimeout(fit, 60)
     } catch (error) {
@@ -1577,7 +1582,7 @@ export function BoardApp({ room }: { room: string }) {
       <input
         ref={picker}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept={ACCEPT}
         multiple
         className="hidden"
         onChange={(event) => {

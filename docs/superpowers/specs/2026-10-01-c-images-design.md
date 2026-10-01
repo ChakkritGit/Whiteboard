@@ -89,3 +89,24 @@ reference.
 2. Run `npm run worker:deploy`.
 
 The site needs no new env var.
+
+## Decision change (2026-10-01)
+
+R2 was not available (it needs a payment method the owner does not have), so the sections above
+on storage, the `/img` routes and the key format no longer apply. Pictures now live **inside the
+document as Base64 data URLs**: `src` is `data:image/(webp|jpeg|png);base64,...`, `aspect` is
+unchanged. The rooms servers carry no picture code and the worker deploys with only the `ROOM`
+binding.
+
+- **Why there is a budget:** a client joining a room receives the whole document in one sync
+  message, and Cloudflare caps a WebSocket message at 1MB. A document over about 1MB means nobody
+  can join. So pictures are small and share a budget.
+- **Shrink, in the browser:** a file is refused over 20MB or outside PNG, JPEG, WebP and GIF,
+  then drawn at most 1280 on the longest side and encoded as WebP at quality 0.82, 0.7, 0.55,
+  then again at 960 and 720 (JPEG where the browser cannot write WebP). It stops at the first
+  result of at most **200_000** characters. A GIF becomes a still.
+- **Board budget:** all picture `src` lengths together stay at most **600_000**. A picture that
+  would cross it is refused with a toast. An imported file may exceed it (it is a local board)
+  and shows a warning that it may be too large to share.
+- **Rendering trusts nothing:** a `src` that fails `isPictureSrc` (not a data URL of those three
+  types, or over 200_000) draws the broken placeholder, in the board and in exports.

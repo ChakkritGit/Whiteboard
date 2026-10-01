@@ -137,10 +137,10 @@ const en = {
   kindImage: 'picture',
 
   uploading: 'Uploading',
-  imgTooBig: 'That picture is over 5MB.',
+  imgTooBig: 'This picture could not be made small enough.',
   imgWrongType: 'Only PNG, JPEG, WebP and GIF pictures can be added.',
-  imgTooMany: 'Too many uploads. Wait a few minutes and try again.',
-  imgOffline: 'Could not reach the picture server.',
+  imgBoardFull: 'This board is full of pictures. Remove one to add another.',
+  bigBoard: 'The pictures on this board add up to more than a shared room can hold, so it may not open for others.',
 
   cut: 'Cut',
   copy: 'Copy',
@@ -370,10 +370,10 @@ const th: Dict = {
   kindImage: 'รูปภาพ',
 
   uploading: 'กำลังอัปโหลด',
-  imgTooBig: 'รูปใหญ่เกิน 5MB',
+  imgTooBig: 'ย่อรูปนี้ให้เล็กพอไม่ได้',
   imgWrongType: 'เพิ่มได้เฉพาะรูป PNG, JPEG, WebP และ GIF',
-  imgTooMany: 'อัปโหลดบ่อยเกินไป รอสักครู่แล้วลองใหม่',
-  imgOffline: 'เชื่อมต่อเซิร์ฟเวอร์รูปภาพไม่ได้',
+  imgBoardFull: 'บอร์ดนี้มีรูปเต็มแล้ว ลบรูปเดิมออกก่อนเพิ่มรูปใหม่',
+  bigBoard: 'รูปในบอร์ดนี้รวมกันใหญ่เกินกว่าห้องที่แชร์จะรับได้ คนอื่นอาจเปิดบอร์ดไม่ได้',
 
   cut: 'ตัด',
   copy: 'คัดลอก',

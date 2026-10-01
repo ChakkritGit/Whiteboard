@@ -58,22 +58,31 @@ assert.ok(zd.startsWith('M') && zd.endsWith('Z') && !/NaN/.test(zd))
 assert.equal(inkPath(zig, undefined, 4, false), zd)
 console.log('ink ok')
 
-const { sniff: sniffImage, KEY_RE, MAX_IMAGE_BYTES } = await import('../src/lib/image-rules.ts')
-const head = (...b: number[]) => Uint8Array.from([...b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-assert.equal(sniffImage(head(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)), 'image/png')
-assert.equal(sniffImage(head(0xff, 0xd8, 0xff, 0xe0)), 'image/jpeg')
-assert.equal(sniffImage(head(0x47, 0x49, 0x46, 0x38, 0x39, 0x61)), 'image/gif')
-assert.equal(sniffImage(Uint8Array.from([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50])), 'image/webp')
-assert.equal(sniffImage(Uint8Array.from([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x41, 0x56, 0x45])), null, 'a WAV is not a WebP')
-assert.equal(sniffImage(new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>')), null)
-assert.equal(sniffImage(new TextEncoder().encode('<html><script>1</script>')), null)
-assert.equal(sniffImage(new Uint8Array(0)), null)
+const { isPictureSrc, budgetLeft, MAX_SRC, BOARD_BUDGET } = await import('../src/lib/image-rules.ts')
+const tiny = 'data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=='
+assert.ok(isPictureSrc(tiny))
+assert.ok(isPictureSrc('data:image/png;base64,iVBORw0KGgo='))
 const uuid = '0b9f3c1e-5a6d-4e7f-8a1b-2c3d4e5f6a7b'
-assert.ok(KEY_RE.test(`${uuid}.png`))
-for (const bad of ['../x.png', 'x.svg', `${uuid.toUpperCase()}.png`, `${uuid}.svg`, `../${uuid}.png`, `${uuid}.png\n`]) {
-  assert.ok(!KEY_RE.test(bad), bad)
+for (const bad of [
+  'javascript:alert(1)',
+  'data:image/svg+xml;base64,PHN2Zz4=',
+  'https://example.com/a.png',
+  `${uuid}.png`,
+  'data:image/webp;base64,UklG RhoA',
+  `data:image/webp;base64,${'A'.repeat(MAX_SRC)}`,
+  undefined,
+  42,
+]) {
+  assert.ok(!isPictureSrc(bad), String(bad).slice(0, 40))
 }
-assert.equal(MAX_IMAGE_BYTES, 5242880)
+assert.equal(`data:image/webp;base64,${'A'.repeat(MAX_SRC - 23)}`.length, MAX_SRC)
+assert.ok(isPictureSrc(`data:image/webp;base64,${'A'.repeat(MAX_SRC - 23)}`), 'exactly MAX_SRC is allowed')
+assert.equal(budgetLeft([]), BOARD_BUDGET)
+assert.equal(
+  budgetLeft([{ kind: 'image', src: tiny }, { kind: 'sticky', src: 'x'.repeat(1000) }, { kind: 'image' }]),
+  BOARD_BUDGET - tiny.length,
+  'only pictures count',
+)
 console.log('image rules ok')
 
 const { TEMPLATES, layoutKanban, layoutTimeline, resolveRefs } = await import('../src/lib/templates.ts')

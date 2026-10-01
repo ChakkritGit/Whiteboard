@@ -1,42 +1,34 @@
 /**
- * What an uploaded picture has to be, shared by the app and both room servers.
+ * What a picture in the document has to be.
  *
- * Imports nothing on purpose: the Node server, the Cloudflare worker, the
- * browser and the check script all load this file as it is.
+ * Imports nothing on purpose: the browser and the check script load this file
+ * as it is.
+ *
+ * A picture is a Base64 data URL inside the doc. A client joining a room gets
+ * the whole doc in one WebSocket message and Cloudflare caps that at 1MB, so a
+ * picture is small and a board has a budget for all of them together.
  */
 
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+/** The longest `src` one picture may have, in characters (about 150KB of bytes). */
+export const MAX_SRC = 200_000
 
-export const IMAGE_TYPES = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-} as const
+/** The most `src` characters every picture on a board may add up to. */
+export const BOARD_BUDGET = 600_000
 
-/** The other way round, for serving a stored picture by its extension. */
-export const EXT_TYPES: Record<string, string> = Object.fromEntries(
-  Object.entries(IMAGE_TYPES).map(([type, ext]) => [ext, type]),
-)
+/** A file bigger than this is refused before it is decoded. */
+export const MAX_INPUT_BYTES = 20 * 1024 * 1024
 
-/** A stored picture's name: a lowercase uuid and one of the four extensions. Nothing else is ever a key. */
-export const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp|gif)$/
+export const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 
-const starts = (bytes: Uint8Array, at: number, head: number[]) =>
-  bytes.length >= at + head.length && head.every((b, i) => bytes[at + i] === b)
+/** The only shapes of `src` that are ever drawn. No SVG: it can carry script. */
+export const DATA_URL_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/
 
-/**
- * The type the bytes say they are, or null.
- *
- * Read from the first bytes, never from the file name or the `Content-Type` the
- * browser sent: both are whatever the sender typed, and a file called `.png`
- * that is really HTML or SVG would otherwise be served back from our own origin.
- */
-export function sniff(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
-  if (starts(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png'
-  if (starts(bytes, 0, [0xff, 0xd8, 0xff])) return 'image/jpeg'
-  if (starts(bytes, 0, [0x47, 0x49, 0x46, 0x38])) return 'image/gif'
-  // RIFF, four bytes of length, then WEBP.
-  if (starts(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && starts(bytes, 8, [0x57, 0x45, 0x42, 0x50])) return 'image/webp'
-  return null
+/** True for a `src` that is safe to hand to an `<img>`. Anything a peer wrote is checked with this. */
+export function isPictureSrc(src: unknown): src is string {
+  return typeof src === 'string' && src.length <= MAX_SRC && DATA_URL_RE.test(src)
+}
+
+/** What is left of the board's picture budget; negative when it is over. */
+export function budgetLeft(items: { kind: string; src?: string }[]): number {
+  return BOARD_BUDGET - items.reduce((sum, i) => sum + (i.kind === 'image' ? (i.src?.length ?? 0) : 0), 0)
 }

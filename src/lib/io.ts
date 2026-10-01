@@ -3,7 +3,7 @@
 import { jpegToPdf } from './pdf'
 import { toCanvas, type PictureFormat } from './picture'
 import { PALETTE } from './palette'
-import { KEY_RE } from './image-rules'
+import { isPictureSrc } from './image-rules'
 import type { BoardFile, Item, ItemKind } from './types'
 
 /**
@@ -183,12 +183,11 @@ function isItem(value: unknown): value is Item {
       Array.isArray(value.points) &&
       value.pressure.length === value.points.length / 2 &&
       value.pressure.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1))
-  // A picture is a reference: without a well-formed key and a usable aspect it
-  // would request a path of somebody else's choosing, or be laid out at NaN.
+  // A picture is a data URL: without a src that passes the check it would draw
+  // whatever a stranger wrote, and without a usable aspect it lays out at NaN.
   const imageOk =
     value.kind !== 'image' ||
-    (typeof value.src === 'string' &&
-      KEY_RE.test(value.src) &&
+    (isPictureSrc(value.src) &&
       typeof value.aspect === 'number' &&
       Number.isFinite(value.aspect) &&
       value.aspect > 0)

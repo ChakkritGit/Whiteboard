@@ -42,7 +42,7 @@ export type Item = {
   pressure?: number[]
   /** What outline a shape has. Missing means a rectangle. */
   shape?: 'rect' | 'ellipse' | 'diamond'
-  /** A picture's key in the image store, never a URL: see `IMG_BASE`. */
+  /** A picture as a Base64 data URL, checked with `isPictureSrc` before it is ever drawn. */
   src?: string
   /** A picture's width over its height, as uploaded; resizing keeps it. */
   aspect?: number
