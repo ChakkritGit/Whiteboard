@@ -230,7 +230,7 @@ export function BoardItem({
             event.stopPropagation()
             onDoubleClick()
           }}
-          className="absolute -top-7 left-0 max-w-full truncate rounded-md bg-accent px-2 py-1 font-hand text-xs font-semibold text-[#1B1B3A]"
+          className="absolute -top-7 left-0 max-w-full truncate rounded-md bg-accent px-2 py-1 font-hand text-xs font-semibold text-on-accent"
         >
           {editing ? (
             <span
@@ -275,8 +275,9 @@ export function BoardItem({
             contentEditable={editing}
             suppressContentEditableWarning
             onInput={(event) => onChange(event.currentTarget.innerText)}
-            className="sticky-text font-hand max-h-full w-full text-center text-[15px] text-[var(--deep)] outline-none dark:text-[var(--night)]"
-            style={{ fontWeight: item.weight ?? 600, '--deep': swatch.deep, '--night': swatch.night } as React.CSSProperties}
+            // Always `deep`: the shape is filled with the pale tint in both themes, and `night` on it was pink on pink.
+            className="sticky-text font-hand max-h-full w-full text-center text-[15px] text-[var(--deep)] outline-none"
+            style={{ fontWeight: item.weight ?? 600, '--deep': swatch.deep } as React.CSSProperties}
           >
             {editing ? null : item.text}
           </div>

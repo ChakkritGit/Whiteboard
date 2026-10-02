@@ -26,9 +26,9 @@ import type { Item } from './types'
 export type PictureFormat = 'png' | 'jpeg' | 'pdf'
 
 /** The light theme, always: an exported picture is a document, not a screenshot. */
-const CANVAS = '#f7f1e3'
-const INK = '#1b1b3a'
-const PANEL = '#fffdf7'
+const CANVAS = '#f4f2ee'
+const INK = '#1f2430'
+const PANEL = '#ffffff'
 
 /** Read per picture, not at load: the hand font's family name is only known once Next has set it. */
 const font = () => {
@@ -185,7 +185,7 @@ function drawMissing(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.beginPath()
   ctx.rect(0, 0, w, h)
   ctx.clip()
-  ctx.strokeStyle = 'rgba(27, 27, 58, 0.15)'
+  ctx.strokeStyle = 'rgba(31, 36, 48, 0.15)'
   ctx.lineWidth = 2
   ctx.beginPath()
   for (let d = -h; d < w; d += 9) {
@@ -195,7 +195,7 @@ function drawMissing(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.stroke()
   ctx.translate(w / 2 - 16, h / 2 - 16)
   ctx.scale(32 / 24, 32 / 24)
-  ctx.strokeStyle = 'rgba(27, 27, 58, 0.5)'
+  ctx.strokeStyle = 'rgba(31, 36, 48, 0.5)'
   ctx.lineWidth = 1.7
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -232,7 +232,7 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item, pictures: Map<strin
       const img = item.src ? pictures.get(item.src) : null
       if (img) ctx.drawImage(img, 0, 0, item.w, item.h)
       else drawMissing(ctx, item.w, item.h)
-      sketch(ctx, item, 'frame', 'rgba(27, 27, 58, 0.7)', undefined, true)
+      sketch(ctx, item, 'frame', 'rgba(31, 36, 48, 0.7)', undefined, true)
       break
     }
 
@@ -241,18 +241,18 @@ function drawItem(ctx: CanvasRenderingContext2D, item: Item, pictures: Map<strin
       ctx.globalAlpha = 0.5
       ctx.fillRect(0, 0, item.w, item.h)
       ctx.globalAlpha = 1
-      sketch(ctx, item, 'frame', 'rgba(27, 27, 58, 0.7)')
+      sketch(ctx, item, 'frame', 'rgba(31, 36, 48, 0.7)')
 
       // The label chip, above the top-left corner.
       const label = item.text || 'Frame'
       ctx.font = `600 12px ${font()}`
       const width = Math.min(ctx.measureText(label).width + 16, item.w)
-      ctx.fillStyle = '#FF48B0'
+      ctx.fillStyle = '#6366F1'
       ctx.save()
       ctx.translate(0, -28)
       roundedRect(ctx, width, 22, 6)
       ctx.fill()
-      ctx.fillStyle = INK
+      ctx.fillStyle = '#ffffff'
       ctx.textBaseline = 'middle'
       ctx.fillText(label, 8, 12)
       ctx.restore()

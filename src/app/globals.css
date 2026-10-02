@@ -6,13 +6,15 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme {
-  --color-canvas: #f7f1e3;
-  --color-panel: #fffdf7;
-  --color-ink: #1b1b3a;
-  --color-muted: #6e6a80;
-  --color-line: #e6dcc8;
-  --color-accent: #ff48b0;
-  --color-accent-ink: #b0005f;
+  --color-canvas: #f4f2ee;
+  --color-panel: #ffffff;
+  --color-ink: #1f2430;
+  --color-muted: #6b7280;
+  --color-line: #e5e3df;
+  --color-accent: #6366f1;
+  --color-accent-ink: #4338ca;
+  /* Text on a solid accent: white on the light indigo, ink on the dark one. */
+  --color-on-accent: #ffffff;
 }
 
 /**
@@ -25,20 +27,21 @@
  * step with the stored preference.
  */
 :root {
-  --paper-dot: rgb(27 27 58 / 0.07);
-  --paper-dot-soft: rgb(27 27 58 / 0.05);
-  --card-shadow: rgb(27 27 58 / 0.85);
+  --paper-dot: rgb(31 36 48 / 0.07);
+  --paper-dot-soft: rgb(31 36 48 / 0.05);
+  --card-shadow: rgb(31 36 48 / 0.85);
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --color-canvas: #141a33;
-  --color-panel: #1c2347;
-  --color-ink: #f7f1e3;
-  --color-muted: #a9a6c2;
-  --color-line: #2e3763;
-  --color-accent: #ff6bc1;
-  --color-accent-ink: #ff8fd0;
+  --color-canvas: #14161b;
+  --color-panel: #1c1f27;
+  --color-ink: #e9ebf1;
+  --color-muted: #9aa2b1;
+  --color-line: #2b2f3a;
+  --color-accent: #818cf8;
+  --color-accent-ink: #a5b4fc;
+  --color-on-accent: #1f2430;
   --card-shadow: color-mix(in oklab, var(--color-accent) 60%, transparent);
   --paper-dot: rgb(255 255 255 / 0.09);
   --paper-dot-soft: rgb(255 255 255 / 0.06);

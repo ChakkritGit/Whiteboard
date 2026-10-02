@@ -15,7 +15,7 @@ for (const [name, s] of Object.entries(PALETTE)) {
   const r = ratio(s.deep, s.tint)
   console.log(name.padEnd(9), r.toFixed(2))
   assert.ok(r >= 4.5, `${name}: deep on fill is ${r.toFixed(2)}:1`)
-  const n = ratio(s.night, '#141A33')
+  const n = ratio(s.night, '#14161B')
   console.log(''.padEnd(9), 'night', n.toFixed(2))
   assert.ok(n >= 4.5, `${name}: night on the dark canvas is ${n.toFixed(2)}:1`)
 }

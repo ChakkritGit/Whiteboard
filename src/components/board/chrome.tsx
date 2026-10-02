@@ -76,11 +76,11 @@ export function TopBar({
           title={live ? t.connectedTo(WS_URL) : t.notConnectedTo(WS_URL)}
           className={`hidden cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${
             live
-              ? 'bg-[#00A95C]/15 text-[#00512B] dark:text-[#A8E6C6]'
+              ? 'bg-[#ecfdf5] text-[#047857] dark:bg-[#064e3b]/50 dark:text-[#6ee7b7]'
               : 'bg-canvas text-muted'
           }`}
         >
-          <span className={`size-1.5 rounded-full ${live ? 'bg-[#00A95C]' : 'bg-[#9ca3af]'}`} />
+          <span className={`size-1.5 rounded-full ${live ? 'bg-[#10b981]' : 'bg-[#9ca3af]'}`} />
           {live ? t.live : t.offline}
         </span>
 
@@ -206,7 +206,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onShare}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-[#1B1B3A] shadow-[3px_3px_0_var(--color-ink)] hover:-translate-y-px"
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-on-accent shadow-[3px_3px_0_var(--color-ink)] hover:-translate-y-px"
         >
           {shared ? t.linkCopied : t.share}
         </button>
@@ -382,7 +382,7 @@ export type Tool =
   | 'arrow'
   | 'image'
 
-/** The Riso ink each tool lights up in when it is the active one. */
+/** The colour each tool lights up in when it is the active one. */
 const TOOL_INK: Record<Tool, Swatch> = {
   select: 'slate',
   pen: 'indigo',

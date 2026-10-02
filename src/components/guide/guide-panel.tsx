@@ -200,7 +200,7 @@ export default function GuidePanel({
                   <button
                     type="button"
                     onClick={() => m.tidy && apply(m.id, m.tidy.groups)}
-                    className="cursor-pointer rounded-md border-[1.5px] border-ink bg-accent px-2.5 py-1 text-xs font-semibold text-white"
+                    className="cursor-pointer rounded-md border-[1.5px] border-ink bg-accent px-2.5 py-1 text-xs font-semibold text-on-accent"
                   >
                     {t.guideApply}
                   </button>
@@ -225,7 +225,7 @@ export default function GuidePanel({
             type="button"
             aria-pressed={mode === id}
             onClick={() => setMode(id)}
-            className={`cursor-pointer rounded-full border-[1.5px] border-ink px-2.5 py-0.5 text-xs font-semibold ${mode === id ? 'bg-accent text-white' : ''}`}
+            className={`cursor-pointer rounded-full border-[1.5px] border-ink px-2.5 py-0.5 text-xs font-semibold ${mode === id ? 'bg-accent text-on-accent' : ''}`}
           >
             {label}
           </button>
@@ -250,7 +250,7 @@ export default function GuidePanel({
         <button
           type="submit"
           disabled={busy || !text.trim()}
-          className="cursor-pointer rounded-md border-[1.5px] border-ink bg-accent px-3 text-sm font-semibold text-white disabled:opacity-50"
+          className="cursor-pointer rounded-md border-[1.5px] border-ink bg-accent px-3 text-sm font-semibold text-on-accent disabled:opacity-50"
         >
           {t.guideSend}
         </button>

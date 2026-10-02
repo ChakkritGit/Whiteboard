@@ -40,7 +40,7 @@ export function StartBoard({
         }
         router.push(`/b/${nanoid(10)}`)
       }}
-      className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-[#1B1B3A] shadow-[3px_3px_0_var(--color-ink)] transition hover:-translate-y-px disabled:opacity-70"
+      className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-on-accent shadow-[3px_3px_0_var(--color-ink)] transition hover:-translate-y-px disabled:opacity-70"
       disabled={going}
     >
       {going ? opening : label}
