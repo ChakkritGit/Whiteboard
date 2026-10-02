@@ -91,8 +91,30 @@ async function failure(res: Response): Promise<ErrorCode> {
   return BY_STATUS[res.status] ?? 'upstream'
 }
 
-const post = (body: Body, signal: AbortSignal) =>
-  fetch(ASSISTANT_URL, {
+/** The site's own chat, beside the board endpoint: it knows every article and sends cards. */
+export const CHAT_URL = ASSISTANT_URL.replace(/\/board$/, '')
+
+/** An article or project the chat pointed at. Only links back to the site are kept. */
+export type Card = { id: string; kind: 'post' | 'project'; title: string; url: string }
+
+export function toCards(items: unknown): Card[] {
+  if (!Array.isArray(items)) return []
+  const site = new URL(CHAT_URL).origin + '/'
+  return items
+    .filter(
+      (c): c is Card =>
+        !!c &&
+        typeof c.id === 'string' &&
+        (c.kind === 'post' || c.kind === 'project') &&
+        typeof c.title === 'string' &&
+        typeof c.url === 'string' &&
+        c.url.startsWith(site),
+    )
+    .slice(0, 3)
+}
+
+const post = (body: unknown, signal: AbortSignal, url = ASSISTANT_URL) =>
+  fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -139,12 +161,14 @@ export function parseSse(chunk: string, carry: string): { events: { event: strin
 
 /** Feed `onText` as the words arrive. Never leaves the caller waiting: every way out returns. */
 export async function streamGuide(
-  body: Body,
+  body: unknown,
   onText: (t: string) => void,
   signal: AbortSignal,
+  /** The site's chat instead of the board, for a question; its cards come to `onCards`. */
+  chat?: { onCards: (cards: Card[]) => void },
 ): Promise<'done' | { code: ErrorCode }> {
   try {
-    const res = await post(body, signal)
+    const res = await post(body, signal, chat ? CHAT_URL : ASSISTANT_URL)
     if (!res.ok) return { code: await failure(res) }
     if (!res.body) return { code: 'upstream' }
     const reader = res.body.getReader()
@@ -172,6 +196,14 @@ export async function streamGuide(
             if (typeof t === 'string') onText(t)
           } catch {
             // a torn event carries nothing worth showing
+          }
+        }
+        if (event === 'cards' && chat) {
+          try {
+            const cards = toCards((JSON.parse(data) as { items?: unknown }).items)
+            if (cards.length) chat.onCards(cards)
+          } catch {
+            // no cards, the words still stand
           }
         }
       }

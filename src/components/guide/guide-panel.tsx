@@ -6,10 +6,16 @@ import { applyTidy, placeTemplate } from '@/lib/board'
 import type { Camera, Item } from '@/lib/types'
 import { useLang } from '@/lib/i18n'
 import { boxOf, clearOf, layoutFlowchart, layoutKanban, layoutTimeline } from '@/lib/templates'
-import { askGuide, buildDigest, streamGuide, tidyLayout, type ErrorCode, type Group, type Mode } from '@/lib/guide'
+import { askGuide, buildDigest, streamGuide, tidyLayout, type Card, type ErrorCode, type Group, type Mode } from '@/lib/guide'
 import type { GlobeState } from './globe'
 
-type Message = { id: number; from: 'me' | 'guide'; text: string; tidy?: { groups: Group[]; status: 'pending' | 'applied' | 'cancelled' } }
+type Message = {
+  id: number
+  from: 'me' | 'guide'
+  text: string
+  tidy?: { groups: Group[]; status: 'pending' | 'applied' | 'cancelled' }
+  cards?: Card[]
+}
 
 /** The chat card. Loaded on the first click of the globe and not before. */
 export default function GuidePanel({
@@ -106,7 +112,21 @@ export default function GuidePanel({
           say('guide', error(answer.code))
         } else if (answer.kind === 'plan') {
           if (answer.plan.type === 'answer') {
-            say('guide', answer.plan.text)
+            // A question: answered by the site's own chat, streamed word by word, with its cards.
+            // The planner's one-liner stands in only if nothing at all came back.
+            const fallback = answer.plan.text
+            const id = say('guide', '')
+            let heard = false
+            const result = await streamGuide(
+              { messages: [{ role: 'user', content: request.slice(0, 500) }], lang },
+              (chunk) => {
+                heard = true
+                patch(id, (m) => ({ ...m, text: m.text + chunk }))
+              },
+              controller.signal,
+              { onCards: (cards) => patch(id, (m) => ({ ...m, cards })) },
+            )
+            if (result !== 'done' && !heard) patch(id, (m) => ({ ...m, text: fallback }))
           } else {
             const plan = answer.plan
             const title = plan.title || t.untitled
@@ -208,6 +228,24 @@ export default function GuidePanel({
           ) : (
             <div key={m.id} className="mr-6 self-start">
               <p className="sticky-text font-hand text-base leading-snug">{m.text || (busy ? t.guideThinking : '')}</p>
+              {m.cards && (
+                <div className="mt-1.5 flex flex-col gap-1.5">
+                  {m.cards.map((card) => (
+                    <a
+                      key={card.id}
+                      href={card.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg border-[1.5px] border-ink bg-panel px-2.5 py-1.5 shadow-[2px_2px_0_var(--card-shadow)] hover:-translate-y-px"
+                    >
+                      <span className="block text-[11px] font-bold tracking-wide text-accent-ink uppercase">
+                        {card.kind === 'post' ? t.guideCardPost : t.guideCardProject}
+                      </span>
+                      <span className="block text-sm leading-snug font-semibold">{card.title}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
               {m.tidy?.status === 'pending' && (
                 <div className="mt-1.5 flex gap-2">
                   <button

@@ -147,7 +147,13 @@ assert.ok(boxOf(shifted)!.minX >= 500, 'past everything in its rows')
 assert.equal(shifted[0].y, 0, 'right, not down')
 console.log('templates ok')
 
-const { buildDigest, parseSse } = await import('../src/lib/guide.ts')
+const { buildDigest, parseSse, toCards, CHAT_URL } = await import('../src/lib/guide.ts')
+assert.equal(CHAT_URL, 'https://chakkritton.com/api/assistant')
+const card = { id: 'post:th:a', kind: 'post', title: 'A', url: 'https://chakkritton.com/blog/a' }
+assert.deepEqual(toCards([card]), [card])
+assert.deepEqual(toCards([{ ...card, url: 'https://evil.example/a' }, { ...card, url: 'javascript:alert(1)' }, { ...card, kind: 'x' }, null, 'a']), [], 'only links back to the site')
+assert.equal(toCards([card, card, card, card]).length, 3)
+assert.deepEqual(toCards(undefined), [])
 type It = import('../src/lib/types.ts').Item
 const note = (id: string, x: number, y: number, text = 'n', extra: Partial<It> = {}): It =>
   ({ id, kind: 'sticky', x, y, w: 100, h: 100, text, color: 'sky', z: 0, ...extra })
