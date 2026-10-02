@@ -659,6 +659,8 @@ export function ToolDock({
                 aria-pressed={on}
                 onClick={() => {
                   setFlyout(false)
+                  setPalette(false)
+                  onTemplates(false)
                   onTool(entry.id)
                 }}
                 className={`grid size-10 place-items-center rounded-xl transition-colors ${
@@ -717,7 +719,12 @@ export function ToolDock({
                     title={t.moreShapes}
                     aria-label={t.moreShapes}
                     aria-expanded={flyout}
-                    onClick={() => setFlyout((open) => !open)}
+                    onClick={() => {
+                      // One popover at a time: they share the space over the dock.
+                      onTemplates(false)
+                      setPalette(false)
+                      setFlyout((open) => !open)
+                    }}
                     className="-ml-0.5 grid h-10 w-4 place-items-center rounded-lg text-muted hover:bg-canvas"
                   >
                     <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -737,7 +744,11 @@ export function ToolDock({
           title={t.templates}
           aria-label={t.templates}
           aria-expanded={templates}
-          onClick={() => onTemplates(!templates)}
+          onClick={() => {
+            setFlyout(false)
+            setPalette(false)
+            onTemplates(!templates)
+          }}
           className={`grid size-10 place-items-center rounded-xl ${templates ? 'bg-accent/12' : 'text-muted hover:bg-canvas'}`}
         >
           <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -750,7 +761,11 @@ export function ToolDock({
           title={t.colour}
           aria-label={t.colour}
           aria-expanded={palette}
-          onClick={() => setPalette((open) => !open)}
+          onClick={() => {
+            setFlyout(false)
+            onTemplates(false)
+            setPalette((open) => !open)
+          }}
           className="grid size-10 place-items-center rounded-xl hover:bg-canvas"
         >
           <span
