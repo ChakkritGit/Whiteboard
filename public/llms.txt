@@ -1,0 +1,26 @@
+# Whiteboard
+
+> A free online whiteboard with nothing to sign up for. Open a board, send the link, and whoever opens it is in the room with you: draw, write and move notes together in real time.
+
+Whiteboard is a collaborative canvas at whiteboard.chakkritton.com. There are no accounts: the link is the access. Boards sync live between everyone in the room and are also kept in the browser, so they open offline.
+
+## Features
+
+- Real-time collaboration on a shared link, with live cursors and names
+- Sticky notes, text, frames, shapes (rectangle, ellipse, diamond), lines and arrows that stay attached to what they connect
+- A smooth pressure-sensitive pen (Apple Pencil works), a highlighter and an eraser
+- Pictures by drop, paste or picker
+- Planning and software templates: kanban, timeline, retro, mind map, flowchart, architecture, story map, sprint board
+- Mr. Worldwide, an AI guide that drafts a plan or flowchart onto the board, summarises it, tidies loose notes into groups, and answers questions about chakkritton.com
+- Export as PNG, JPEG, PDF or a JSON file you can import again
+- Thai and English, light and dark themes
+
+## Pages
+
+- [Home (Thai)](https://whiteboard.chakkritton.com): start a new board
+- [Home (English)](https://whiteboard.chakkritton.com/en)
+
+## Related
+
+- [Author: Chakkrit Laolit](https://chakkritton.com)
+- [System status](https://status.chakkritton.com)
