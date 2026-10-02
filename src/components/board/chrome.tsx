@@ -200,7 +200,8 @@ export function TopBar({
           }}
         >
           <IconButton label={t.exportBoard} onClick={() => setExporting((open) => !open)}>
-            <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
+            {/* A floppy: saving the board as a file or a picture. */}
+            <path d="M5 4h11l3 3v13H5V4ZM8 4v5h7V4M8 20v-6h8v6" />
           </IconButton>
           {exporting && (
             <div className="glass absolute top-full right-0 z-40 mt-1.5 w-40 rounded-xl p-1">
@@ -229,7 +230,7 @@ export function TopBar({
         </div>
 
         <IconButton label={t.importBoard} onClick={onImport}>
-          <path d="M12 20V9M8 13l4-4 4 4M5 4h14" />
+          <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
         </IconButton>
 
         <button

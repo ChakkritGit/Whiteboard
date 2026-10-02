@@ -15,6 +15,8 @@ export type Plan =
   | { type: 'kanban'; title: string; columns: { title: string; cards: string[] }[] }
   | { type: 'timeline'; title: string; milestones: { title: string; note?: string }[] }
   | { type: 'flowchart'; title: string; nodes: FlowNode[]; edges: FlowEdge[] }
+  /** A question rather than something to draw: said in the chat only. */
+  | { type: 'answer'; text: string }
 export type Group = { title: string; ids: string[] }
 type Body = { mode: Mode; lang: 'th' | 'en'; request: string; board: { items: DigestItem[] } }
 export type ErrorCode = 'quota' | 'rate_limited' | 'unparseable' | 'upstream' | 'bad_request' | 'forbidden' | 'offline'

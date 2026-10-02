@@ -62,6 +62,7 @@ export function Guide({
   viewport,
   history,
   select,
+  centreOn,
   open,
   onOpen,
 }: {
@@ -71,6 +72,7 @@ export function Guide({
   viewport: { w: number; h: number }
   history: ReturnType<typeof useHistory>
   select: (ids: string[]) => void
+  centreOn: (x: number, y: number) => void
   /** Owned by the board so the welcome can open the guide too. */
   open: boolean
   onOpen: (open: boolean) => void
@@ -93,6 +95,7 @@ export function Guide({
           viewport={viewport}
           history={history}
           select={select}
+          centreOn={centreOn}
         />
       )}
       <button

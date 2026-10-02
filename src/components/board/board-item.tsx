@@ -18,15 +18,17 @@ import { isPictureSrc } from '@/lib/image-rules'
  */
 export type Corner = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 
+// On the selection ring, not the item's edge: the ring sits 6px out (see `ring`),
+// so a grip's centre is 7px out, the middle of the 2px ring.
 const GRIPS: { id: Corner; at: string; cursor: string }[] = [
-  { id: 'nw', at: '-top-1.5 -left-1.5', cursor: 'nwse-resize' },
-  { id: 'n', at: '-top-1.5 left-1/2 -translate-x-1/2', cursor: 'ns-resize' },
-  { id: 'ne', at: '-top-1.5 -right-1.5', cursor: 'nesw-resize' },
-  { id: 'e', at: 'top-1/2 -right-1.5 -translate-y-1/2', cursor: 'ew-resize' },
-  { id: 'se', at: '-bottom-1.5 -right-1.5', cursor: 'nwse-resize' },
-  { id: 's', at: '-bottom-1.5 left-1/2 -translate-x-1/2', cursor: 'ns-resize' },
-  { id: 'sw', at: '-bottom-1.5 -left-1.5', cursor: 'nesw-resize' },
-  { id: 'w', at: 'top-1/2 -left-1.5 -translate-y-1/2', cursor: 'ew-resize' },
+  { id: 'nw', at: '-top-[13px] -left-[13px]', cursor: 'nwse-resize' },
+  { id: 'n', at: '-top-[13px] left-1/2 -translate-x-1/2', cursor: 'ns-resize' },
+  { id: 'ne', at: '-top-[13px] -right-[13px]', cursor: 'nesw-resize' },
+  { id: 'e', at: 'top-1/2 -right-[13px] -translate-y-1/2', cursor: 'ew-resize' },
+  { id: 'se', at: '-bottom-[13px] -right-[13px]', cursor: 'nwse-resize' },
+  { id: 's', at: '-bottom-[13px] left-1/2 -translate-x-1/2', cursor: 'ns-resize' },
+  { id: 'sw', at: '-bottom-[13px] -left-[13px]', cursor: 'nesw-resize' },
+  { id: 'w', at: 'top-1/2 -left-[13px] -translate-y-1/2', cursor: 'ew-resize' },
 ]
 
 /**
@@ -54,7 +56,7 @@ function Handles({
             event.stopPropagation()
             onRotate(event)
           }}
-          className="absolute -top-8 left-1/2 grid size-5 -translate-x-1/2 cursor-grab place-items-center rounded-full border border-accent/40 bg-panel text-accent-ink shadow-sm"
+          className="absolute -top-10 left-1/2 grid size-5 -translate-x-1/2 cursor-grab place-items-center rounded-full border border-accent/40 bg-panel text-accent-ink shadow-sm"
         >
           <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4" />
@@ -199,7 +201,9 @@ export function BoardItem({
     transform: item.angle ? `rotate(${item.angle}deg)` : undefined,
   }
 
-  const ring = selected ? 'outline-2 outline-accent' : ''
+  // Clear of the drawing: the sketch wobbles past the box and its fill sits 2px
+  // off, so a ring on the edge was painted over and looked like it was behind.
+  const ring = selected ? 'outline-2 outline-offset-[6px] outline-accent' : ''
   const hooks = {
     onPointerDown,
     onContextMenu,
@@ -224,13 +228,14 @@ export function BoardItem({
 
   if (item.kind === 'frame') {
     return (
-      <div className="absolute" style={box} {...hooks}>
+      // The ring too, not only the accent outline: the drawn outline wobbles, and grips on a wobble never line up.
+      <div className={`absolute ${ring}`} style={box} {...hooks}>
         <span
           onDoubleClick={(event) => {
             event.stopPropagation()
             onDoubleClick()
           }}
-          className="absolute -top-7 left-0 max-w-full truncate rounded-md bg-accent px-2 py-1 font-hand text-xs font-semibold text-on-accent"
+          className="absolute -top-9 left-0 max-w-full truncate rounded-md bg-accent px-2 py-1 font-hand text-xs font-semibold text-on-accent"
         >
           {editing ? (
             <span
@@ -250,7 +255,7 @@ export function BoardItem({
             w={item.w}
             h={item.h}
             kind="frame"
-            line={selected ? 'var(--color-accent)' : 'color-mix(in oklab, var(--color-ink) 70%, transparent)'}
+            line="color-mix(in oklab, var(--color-ink) 70%, transparent)"
           />
         </div>
         {selected && onResize && <Handles onResize={onResize} onRotate={onRotate} />}

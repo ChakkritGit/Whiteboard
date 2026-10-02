@@ -85,7 +85,7 @@ assert.equal(
 )
 console.log('image rules ok')
 
-const { TEMPLATES, layoutKanban, layoutTimeline, layoutFlowchart, resolveRefs } = await import('../src/lib/templates.ts')
+const { TEMPLATES, layoutKanban, layoutTimeline, layoutFlowchart, resolveRefs, clearOf, boxOf } = await import('../src/lib/templates.ts')
 const { DICT } = await import('../src/lib/dictionary.ts')
 const finite = (n: unknown) => typeof n === 'number' && Number.isFinite(n)
 for (const lang of ['en', 'th'] as const) {
@@ -138,6 +138,13 @@ assert.equal(gone.length, 1, 'a connector naming @nope is dropped')
 const ra = resolveRefs(TEMPLATES[4].build(en, { x: 0, y: 0 }), () => Math.random().toString(36))
 const rb = resolveRefs(TEMPLATES[4].build(en, { x: 0, y: 0 }), () => Math.random().toString(36))
 assert.ok(ra.every((a) => rb.every((b) => a.id !== b.id)), 'two placements share an id')
+const spot = [{ kind: 'sticky' as const, x: 0, y: 0, w: 100, h: 100, text: '', color: 'yellow' as const }]
+assert.equal(clearOf(spot, []), spot, 'an empty board leaves it where it is')
+assert.equal(clearOf(spot, [{ kind: 'sticky', x: 500, y: 0, w: 10, h: 10 }]), spot, 'free space leaves it')
+assert.equal(clearOf(spot, [{ kind: 'connector', x: 0, y: 0, w: 100, h: 100 }]), spot, 'a connector takes no space')
+const shifted = clearOf(spot, [{ kind: 'sticky', x: 50, y: 50, w: 100, h: 100 }, { kind: 'frame', x: 300, y: 80, w: 200, h: 200 }])
+assert.ok(boxOf(shifted)!.minX >= 500, 'past everything in its rows')
+assert.equal(shifted[0].y, 0, 'right, not down')
 console.log('templates ok')
 
 const { buildDigest, parseSse } = await import('../src/lib/guide.ts')

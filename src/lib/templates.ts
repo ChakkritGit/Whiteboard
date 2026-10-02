@@ -49,21 +49,46 @@ const link = (from: string, to: string, head: 'end' | 'none' = 'end'): Draft => 
  * Laid out around zero, then shifted: the box is measured from everything that
  * has a place of its own, which leaves out a connector bound to other drafts.
  */
-function centred(drafts: Draft[], origin: Point): Draft[] {
+/** The box of everything with a place of its own: a connector bound to other drafts follows them. */
+export function boxOf(drafts: Draft[]) {
   const placed = drafts.filter((d) => !(d.kind === 'connector' && (d.from || d.to)))
-  if (!placed.length) return drafts
+  if (!placed.length) return null
   const minX = Math.min(...placed.map((d) => d.x))
   const minY = Math.min(...placed.map((d) => d.y))
   const maxX = Math.max(...placed.map((d) => d.x + d.w))
   const maxY = Math.max(...placed.map((d) => d.y + d.h))
-  const dx = Math.round((origin.x - (minX + maxX) / 2) / GRID) * GRID
-  const dy = Math.round((origin.y - (minY + maxY) / 2) / GRID) * GRID
-  return drafts.map((d) => ({
+  return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 }
+}
+
+const shift = (drafts: Draft[], dx: number, dy: number) =>
+  drafts.map((d) => ({
     ...d,
     x: d.x + dx,
     y: d.y + dy,
     points: d.points?.map((value, i) => value + (i % 2 ? dy : dx)),
   }))
+
+function centred(drafts: Draft[], origin: Point): Draft[] {
+  const box = boxOf(drafts)
+  if (!box) return drafts
+  const dx = Math.round((origin.x - box.cx) / GRID) * GRID
+  const dy = Math.round((origin.y - box.cy) / GRID) * GRID
+  return shift(drafts, dx, dy)
+}
+
+/**
+ * The drafts, moved right past whatever already sits in their rows when they
+ * would land on it. A second plan asked for in the same view used to land
+ * exactly on the first, and the answer looked like it never came.
+ */
+export function clearOf(drafts: Draft[], items: Pick<Item, 'kind' | 'x' | 'y' | 'w' | 'h'>[]): Draft[] {
+  const box = boxOf(drafts)
+  if (!box) return drafts
+  // Connectors follow what they join; their own box says nothing about space.
+  const band = items.filter((i) => i.kind !== 'connector' && i.y < box.maxY + GAP && i.y + i.h > box.minY - GAP)
+  if (!band.some((i) => i.x < box.maxX + GAP && i.x + i.w > box.minX - GAP)) return drafts
+  const right = Math.max(...band.map((i) => i.x + i.w))
+  return shift(drafts, Math.ceil((right + GAP * 3 - box.minX) / GRID) * GRID, 0)
 }
 
 /* ------------------------------- layouts -------------------------------- */

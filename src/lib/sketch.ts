@@ -63,6 +63,8 @@ export function shapePaths(
       stroke: line,
       strokeWidth: SKETCH.strokeWidth,
       strokeLineDash: kind === 'frame' ? FRAME_DASH : undefined,
+      // One pass for a dashed frame: roughjs draws every line twice, and two offset dashes read as two lines.
+      disableMultiStroke: kind === 'frame',
     }),
   )
     .map((p) => p.d)

@@ -29,7 +29,7 @@ import { saveMe, type Me } from '@/lib/identity'
 import { useLang } from '@/lib/i18n'
 import { BadFile, EmptyBoard, download, downloadPicture, readFile } from '@/lib/io'
 import { inkPath } from '@/lib/ink'
-import { TEMPLATES, type TemplateId } from '@/lib/templates'
+import { TEMPLATES, boxOf, clearOf, type TemplateId } from '@/lib/templates'
 import { ACCEPT, budgetLeft } from '@/lib/image-rules'
 import { UploadError, pictureFromFile } from '@/lib/upload'
 import { BoardItem, type Corner } from './board-item'
@@ -515,9 +515,14 @@ export function BoardApp({ room }: { room: string }) {
     const tpl = TEMPLATES.find((entry) => entry.id === id)
     if (!tpl) return
     const words = Object.fromEntries(Object.entries(t).filter(([, v]) => typeof v === 'string')) as Record<string, string>
-    const made = placeTemplate(board, tpl.build(words, centre()), name)
+    const built = tpl.build(words, centre())
+    const drafts = clearOf(built, items)
+    const made = placeTemplate(board, drafts, name)
     history.seal()
     setSelection(made)
+    // Moved off the middle to clear what was there, so follow it.
+    const box = drafts !== built && boxOf(drafts)
+    if (box) centreOn(box.cx, box.cy)
   }
 
   const choose = (next: Tool) => {
@@ -1619,7 +1624,7 @@ export function BoardApp({ room }: { room: string }) {
         }}
       />
       <MiniMap items={items} camera={camera} viewport={viewport} />
-      <Guide board={board} items={items} camera={camera} viewport={viewport} history={history} select={setSelection} open={guide} onOpen={setGuide} />
+      <Guide board={board} items={items} camera={camera} viewport={viewport} history={history} select={setSelection} centreOn={centreOn} open={guide} onOpen={setGuide} />
       {menu && <ContextMenu at={menu} entries={entries} onClose={() => setMenu(null)} />}
       <Toast message={toast} onDone={() => setToast(null)} />
     </main>
