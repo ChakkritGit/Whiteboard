@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Camera, Item, Presence, Swatch } from '@/lib/types'
 import { PALETTE, SWATCHES } from '@/lib/palette'
 import { WS_URL } from '@/lib/board'
@@ -10,6 +10,35 @@ import { useTheme, type ThemeMode } from '@/lib/theme'
 import { useLang } from '@/lib/i18n'
 import { DICT, type Lang } from '@/lib/dictionary'
 import { Logo } from './logo'
+
+/**
+ * Closes a popover when you press outside `ref` or hit Escape.
+ *
+ * Capture phase, for the reason `menu.tsx` gives: notes and grips stop pointer
+ * events, so a bubbling listener never heard a press on them.
+ */
+function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, onClose: () => void) {
+  const close = useRef(onClose)
+  useEffect(() => {
+    close.current = onClose
+  })
+  useEffect(() => {
+    if (!open) return
+    const outside = (event: Event) => {
+      if (!ref.current?.contains(event.target as Node)) close.current()
+    }
+    // Escape in a text field is that field's own (it ends a rename), not the panel's.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !(event.target instanceof HTMLInputElement)) close.current()
+    }
+    window.addEventListener('pointerdown', outside, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', outside, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [ref, open])
+}
 
 /* --------------------------------- top --------------------------------- */
 
@@ -466,6 +495,12 @@ export function ToolDock({
   const [lastShape, setLastShape] = useState<Tool>('shape')
   if (SHAPES.includes(tool) && tool !== lastShape) setLastShape(tool)
   const inking = tool === 'pen' || tool === 'highlighter'
+  const dock = useRef<HTMLDivElement>(null)
+  useDismiss(dock, templates || palette || flyout, () => {
+    onTemplates(false)
+    setPalette(false)
+    setFlyout(false)
+  })
   const toolLabel: Record<Tool, string> = {
     select: t.toolSelect,
     pen: t.toolPen,
@@ -503,9 +538,12 @@ export function ToolDock({
   }
 
   return (
-    <div className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+    <div ref={dock} className="pointer-events-auto absolute bottom-5 left-1/2 z-30 -translate-x-1/2">
+      {/* Over the dock, out of its flow: in the flow the widest panel set the
+          dock's width, and opening templates stretched the toolbar to match. */}
+      <div className="absolute bottom-full left-1/2 mb-2 flex w-max -translate-x-1/2 flex-col items-center gap-2">
       {templates && (
-        <div className="glass mb-2 w-fit rounded-xl p-2">
+        <div className="glass w-fit rounded-xl p-2">
           <div className="mb-2 flex gap-1" role="group" aria-label={t.templates}>
             {(['planning', 'software'] as const).map((group) => (
               <button
@@ -544,7 +582,7 @@ export function ToolDock({
       )}
 
       {palette && (
-        <div className="glass mb-2 grid grid-cols-6 gap-1.5 rounded-xl p-2">
+        <div className="glass grid grid-cols-6 gap-1.5 rounded-xl p-2">
           {SWATCHES.map((swatch) => (
             <button
               key={swatch}
@@ -566,7 +604,7 @@ export function ToolDock({
       {/* Only what the current tool or selection can actually use. A row of
           controls that do nothing is worse than no row at all. */}
       {(inking || showType) && (
-        <div className="glass mb-2 flex items-center gap-1 rounded-xl px-2 py-1.5">
+        <div className="glass flex items-center gap-1 rounded-xl px-2 py-1.5">
           {inking &&
             WIDTHS.map((value) => (
               <button
@@ -605,6 +643,7 @@ export function ToolDock({
             ))}
         </div>
       )}
+      </div>
 
       <div className="glass flex items-center gap-0.5 rounded-2xl px-2 py-1.5">
         {TOOLS.filter((base) => base.id !== 'ellipse' && base.id !== 'diamond').map((base) => {
@@ -947,13 +986,15 @@ export function LeftRail({
   const [open, setOpen] = useState<'people' | 'layers' | null>(null)
   const [closed, setClosed] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<string | null>(null)
+  const rail = useRef<HTMLDivElement>(null)
+  useDismiss(rail, open !== null, () => setOpen(null))
 
   // Top of the stack first: the layer list reads the way the board is painted,
   // from what is in front down to what is behind it.
   const rows = useMemo(() => toRows([...items].reverse(), groups), [items, groups])
 
   return (
-    <>
+    <div ref={rail} className="contents">
       <aside className="glass pointer-events-auto absolute top-1/2 left-3 z-20 flex -translate-y-1/2 flex-col items-center gap-1 rounded-xl p-1.5">
         <RailButton
           label={t.people}
@@ -1110,7 +1151,7 @@ export function LeftRail({
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
