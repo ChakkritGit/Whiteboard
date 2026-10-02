@@ -1015,7 +1015,7 @@ export function LeftRail({
       </aside>
 
       {open && (
-        <div className="glass pointer-events-auto absolute top-1/2 left-[68px] z-20 flex max-h-[calc(100vh-140px)] w-64 -translate-y-1/2 flex-col rounded-xl">
+        <div className="glass pointer-events-auto absolute top-1/2 left-[80px] z-20 flex max-h-[calc(100vh-140px)] w-64 -translate-y-1/2 flex-col rounded-xl">
           <p className="px-3 pt-2.5 pb-1.5 text-[11px] font-bold tracking-wide text-muted uppercase">
             {open === 'people' ? t.inThisRoom : t.onTheBoard}
           </p>
