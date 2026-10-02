@@ -99,7 +99,8 @@ export function Welcome({
         <Arrow name="guide" />
       </div>
 
-      <div className="absolute top-[62px] right-5 hidden flex-col items-end sm:flex">
+      {/* The tip lands on Share, which sits left of the status link (about 47px in from where it used to be). */}
+      <div className="absolute top-[62px] right-[67px] hidden flex-col items-end sm:flex">
         <Arrow name="share" />
         <p className={`${note} max-w-[13rem] text-right`}>{t.hintShare}</p>
       </div>
