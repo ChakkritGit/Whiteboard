@@ -240,6 +240,20 @@ export function TopBar({
         >
           {shared ? t.linkCopied : t.share}
         </button>
+
+        {/* After share, apart from the board's own controls: it is about the service, not this board. */}
+        <a
+          href="https://status.chakkritton.com"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label={t.systemStatus}
+          title={t.systemStatus}
+          className="grid size-8 place-items-center rounded-lg border border-line text-muted hover:bg-canvas"
+        >
+          <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12h4l3-8 4 16 3-8h4" />
+          </svg>
+        </a>
       </div>
     </header>
   )
