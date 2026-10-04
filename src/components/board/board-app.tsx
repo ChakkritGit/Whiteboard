@@ -129,6 +129,33 @@ export function BoardApp({ room }: { room: string }) {
   const drawing = useRef<{ id: string; pointerId: number; points: number[]; pressure: number[]; real: boolean; sent: number } | null>(null)
   /** An Apple Pencil has been used here, so a finger on the glass is a palm, never ink. */
   const penSeen = useRef(false)
+  const inking = useRef(false)
+  useEffect(() => {
+    inking.current = tool === 'pen' || tool === 'highlighter' || tool === 'eraser'
+  }, [tool])
+
+  /**
+   * iPadOS watches the pencil for its own gestures (Scribble, the system's text and selection
+   * handling) and, when it decides a stroke is one of them, cancels our pointer mid-line: the
+   * line just stops, at random. Refusing the stylus touch's default keeps the stroke ours, the
+   * way other drawing apps on the web do. Only the stylus and only while drawing: a finger's
+   * taps and double taps still turn into clicks.
+   */
+  useEffect(() => {
+    const node = surface.current
+    if (!node) return
+    const refuse = (event: TouchEvent) => {
+      if (!inking.current) return
+      const stylus = Array.from(event.changedTouches).some((t) => (t as Touch & { touchType?: string }).touchType === 'stylus')
+      if (stylus && event.cancelable) event.preventDefault()
+    }
+    node.addEventListener('touchstart', refuse, { passive: false })
+    node.addEventListener('touchmove', refuse, { passive: false })
+    return () => {
+      node.removeEventListener('touchstart', refuse)
+      node.removeEventListener('touchmove', refuse)
+    }
+  }, [])
   const band = useRef<{ x: number; y: number; add: string[] } | null>(null)
   const erasing = useRef(false)
   /** A line or arrow being dragged out: where it started, and what it started on. */
