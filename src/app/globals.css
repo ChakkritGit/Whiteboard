@@ -118,6 +118,10 @@ textarea,
      away, so there is always something to judge distance against without the
      fine grid turning into a grey wash. */
   .board-paper {
+    /* No iOS callout, text selection or loupe on a long press: it is a held pen, not a word. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
     background-color: var(--color-canvas);
     background-image:
       radial-gradient(circle, var(--paper-dot) 1px, transparent 1px),

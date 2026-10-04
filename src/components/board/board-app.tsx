@@ -297,8 +297,11 @@ export function BoardApp({ room }: { room: string }) {
       const xs = points.filter((_, i) => i % 2 === 0)
       const ys = points.filter((_, i) => i % 2 === 1)
       updateItem(board, id, {
-        points,
-        ...(pressure && { pressure }),
+        // Copies: the caller keeps pushing into these arrays, and handing the same array to the
+        // document every time left every renderer's memo keyed on an array that never changed
+        // identity, so the line on screen stopped at its first few points until a reload.
+        points: points.slice(),
+        ...(pressure && { pressure: pressure.slice() }),
         x: Math.min(...xs),
         y: Math.min(...ys),
         w: Math.max(1, Math.max(...xs) - Math.min(...xs)),
@@ -1072,9 +1075,19 @@ export function BoardApp({ room }: { room: string }) {
 
   /* ------------------------------- the menu ------------------------------ */
 
+  /**
+   * A long press with a finger or the pencil arrives as `contextmenu` on iPad. With a drawing
+   * tool in hand that is someone holding still mid-stroke, not asking for a menu, so it neither
+   * opens one nor selects what is under it. A mouse's right click still does both.
+   */
+  const lastPointer = useRef<string>('mouse')
+  const heldNotRightClick = () =>
+    lastPointer.current !== 'mouse' && (tool === 'pen' || tool === 'highlighter' || tool === 'eraser')
+
   const onItemMenu = (item: Item) => (event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
+    if (heldNotRightClick()) return
     if (!selection.includes(item.id)) setSelection([item.id])
     setMenu({ x: event.clientX, y: event.clientY, on: item.id })
   }
@@ -1469,8 +1482,12 @@ export function BoardApp({ room }: { room: string }) {
         onPointerMove={onSurfaceMove}
         onPointerUp={onSurfaceUp}
         onPointerCancel={onSurfaceUp}
+        onPointerDownCapture={(event) => {
+          lastPointer.current = event.pointerType
+        }}
         onContextMenu={(event) => {
           event.preventDefault()
+          if (heldNotRightClick()) return
           setMenu({ x: event.clientX, y: event.clientY, on: null })
         }}
         // Cancelled for any file, or the browser opens a dropped file in place of the board.
