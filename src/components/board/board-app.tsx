@@ -125,7 +125,10 @@ export function BoardApp({ room }: { room: string }) {
   const [guide, setGuide] = useState(false)
   const drag = useRef<{ ids: string[]; from: { x: number; y: number }; start: Map<string, { x: number; y: number }> } | null>(null)
   const pan = useRef<{ x: number; y: number; camera: Camera } | null>(null)
-  const drawing = useRef<{ id: string; points: number[]; pressure: number[]; real: boolean; sent: number } | null>(null)
+  /** The stroke under the pen, and the one pointer it belongs to: a palm is a second pointer. */
+  const drawing = useRef<{ id: string; pointerId: number; points: number[]; pressure: number[]; real: boolean; sent: number } | null>(null)
+  /** An Apple Pencil has been used here, so a finger on the glass is a palm, never ink. */
+  const penSeen = useRef(false)
   const band = useRef<{ x: number; y: number; add: string[] } | null>(null)
   const erasing = useRef(false)
   /** A line or arrow being dragged out: where it started, and what it started on. */
@@ -626,9 +629,15 @@ export function BoardApp({ room }: { room: string }) {
     const at = toWorld(event.clientX, event.clientY)
 
     if (tool === 'pen' || tool === 'highlighter') {
-      // A palm resting on the glass while the pencil writes must not start a
-      // second stroke.
-      if (drawing.current && event.pointerType === 'touch') return
+      // A palm resting on the glass must not draw. Once a pencil has been seen, no finger does;
+      // before that, a finger may draw, but not while another stroke is already going.
+      if (event.pointerType === 'pen') penSeen.current = true
+      if (event.pointerType === 'touch' && (penSeen.current || drawing.current)) return
+      // The palm landed first and started a stroke; the pencil is the real one.
+      if (drawing.current) {
+        removeItems(board, [drawing.current.id])
+        drawing.current = null
+      }
       // Pressure is only kept from a pen: a mouse reports a constant, and a
       // stroke without any is drawn with simulated pressure instead.
       const real = event.pointerType === 'pen'
@@ -646,7 +655,7 @@ export function BoardApp({ room }: { room: string }) {
         stroke,
         highlight: tool === 'highlighter',
       })
-      drawing.current = { id, points: [at.x, at.y], pressure: first, real, sent: 2 }
+      drawing.current = { id, pointerId: event.pointerId, points: [at.x, at.y], pressure: first, real, sent: 2 }
       setDraft({
         points: [at.x, at.y],
         pressure: real ? first : undefined,
@@ -754,6 +763,8 @@ export function BoardApp({ room }: { room: string }) {
 
     if (drawing.current) {
       const stroke = drawing.current
+      // Another pointer (a palm) moving while the pencil writes: its points are not this line's.
+      if (event.pointerId !== stroke.pointerId) return
       // Every sample the pencil took since the last move, not just the one the
       // browser chose to deliver: it reports about 240Hz against 60Hz of moves.
       const coalesced = event.nativeEvent.getCoalescedEvents?.()
@@ -876,6 +887,8 @@ export function BoardApp({ room }: { room: string }) {
   }
 
   const onSurfaceUp = (event: React.PointerEvent) => {
+    // A palm lifting mid-stroke used to end the pencil's line there.
+    if (drawing.current && event.pointerId !== drawing.current.pointerId) return
     if (surface.current?.hasPointerCapture?.(event.pointerId)) {
       surface.current.releasePointerCapture(event.pointerId)
     }

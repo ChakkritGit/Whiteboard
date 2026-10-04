@@ -73,6 +73,9 @@ body {
 body:has(.board-shell) {
   overflow: hidden;
   overscroll-behavior: none;
+  /* A long press on a toolbar label brought up iOS's "Search / Find in Page" callout. Text fields
+     still select, as set below. */
+  -webkit-touch-callout: none;
 }
 
 /* Tailwind v4's Preflight no longer gives buttons a pointer cursor, and a button
