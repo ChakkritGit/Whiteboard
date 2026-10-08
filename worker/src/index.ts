@@ -170,7 +170,16 @@ export class Room implements DurableObject {
         awarenessProtocol.removeAwarenessStates(this.awareness, Array.from(owned), null)
       }
     }
-    server.addEventListener('close', leave)
+    server.addEventListener('close', (event: CloseEvent) => {
+      leave()
+      // Answer the close. At this compatibility date the runtime does not, so the
+      // handshake never finished: every visit, clean or not, ended as a dropped
+      // connection, which Cloudflare counts as a "client disconnected" error. A
+      // code that may not be sent (1005, 1006) throws; then there is nothing to answer.
+      try {
+        server.close(event.code, 'bye')
+      } catch {}
+    })
     server.addEventListener('error', leave)
 
     return new Response(null, { status: 101, webSocket: client })
