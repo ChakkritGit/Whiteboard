@@ -30,6 +30,10 @@ export default {
     const url = new URL(request.url)
 
     if (request.headers.get('Upgrade') !== 'websocket') {
+      // The status page's probe: a plain request answered by a room object
+      // proves the Durable Object is up, without a socket to open and close
+      // (each one it opened ended up counted on the dashboard as an error).
+      if (url.pathname === '/__health') return env.ROOM.get(env.ROOM.idFromName('__health')).fetch(request)
       return new Response('whiteboard rooms\n', { headers: { 'content-type': 'text/plain' } })
     }
 
@@ -103,7 +107,10 @@ export class Room implements DurableObject {
     }
   }
 
-  async fetch(): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
+    // A plain request is the health probe (see the Worker above).
+    if (request.headers.get('Upgrade') !== 'websocket') return new Response('ok\n', { headers: { 'content-type': 'text/plain' } })
+
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
