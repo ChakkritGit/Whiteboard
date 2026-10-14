@@ -1,6 +1,5 @@
 import { Mali } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+import { DockAnalytics } from '@/components/dock-analytics'
 import { THEME_SCRIPT } from '@/lib/theme-script'
 import type { Lang } from '@/lib/dictionary'
 
@@ -36,8 +35,7 @@ export function Shell({ lang, children }: { lang: Lang; children: React.ReactNod
       </head>
       <body className="h-full">
         {children}
-        <Analytics />
-        <SpeedInsights />
+        <DockAnalytics />
       </body>
     </html>
   )
