@@ -10,9 +10,7 @@
     "server": "node scripts/server.mjs",
     "dev:all": "node scripts/server.mjs & next dev",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-design.ts",
-    "worker": "npm --prefix worker run dev",
-    "worker:deploy": "npm --prefix worker run deploy"
+    "check": "node scripts/check-design.ts"
   },
   "dependencies": {
     "nanoid": "^6.0.1",
