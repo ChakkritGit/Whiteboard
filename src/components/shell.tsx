@@ -2,6 +2,7 @@ import { Mali } from 'next/font/google'
 import { DockAnalytics } from '@/components/dock-analytics'
 import { THEME_SCRIPT } from '@/lib/theme-script'
 import type { Lang } from '@/lib/dictionary'
+import { PwaChrome } from '@/components/pwa-chrome'
 
 /* Self-hosted at build time, so there is no runtime request to Google. */
 const hand = Mali({
@@ -36,6 +37,7 @@ export function Shell({ lang, children }: { lang: Lang; children: React.ReactNod
       <body className="h-full">
         {children}
         <DockAnalytics />
+        <PwaChrome />
       </body>
     </html>
   )
