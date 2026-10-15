@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DICT, type Lang } from '@/lib/dictionary'
 import { SITE } from '@/lib/site'
+import { STARTUP_IMAGES } from '@/lib/splash'
 
 /**
  * One metadata block, in either language.
@@ -22,6 +23,10 @@ export function siteMetadata(lang: Lang): Metadata {
     title: { default: title, template: `%s · ${SITE.name}` },
     description: t.metaDescription,
     applicationName: SITE.name,
+    // installable on a phone: manifest (app/manifest.ts), opaque PNG icons in public/, iOS launch screens
+    manifest: '/manifest.webmanifest',
+    icons: { apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }], icon: [{ url: '/icon.svg', type: 'image/svg+xml' }, { url: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+    appleWebApp: { capable: true, title: SITE.name, statusBarStyle: 'default', startupImage: STARTUP_IMAGES },
     keywords:
       lang === 'th'
         ? ['ไวท์บอร์ดออนไลน์', 'ไวท์บอร์ดฟรี', 'กระดานออนไลน์', 'ไวท์บอร์ดไม่ต้องสมัคร', 'วาดรูปออนไลน์ร่วมกัน', 'โน้ตออนไลน์', 'ทำงานร่วมกันเรียลไทม์', 'whiteboard ภาษาไทย']
