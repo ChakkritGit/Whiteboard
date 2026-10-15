@@ -265,3 +265,25 @@ textarea,
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='26'%20height='26'%20viewBox='0%200%2026%2026'%3E%3Cg%20transform='rotate%28-40%2013%2013%29'%3E%3Crect%20x='5.5'%20y='7.5'%20width='15'%20height='9.5'%20rx='2.5'%20fill='%23fff'%20stroke='%231f2430'%20stroke-width='1.6'/%3E%3Cpath%20d='M13%207.5v9.5'%20stroke='%231f2430'%20stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") 5 19,
     crosshair;
 }
+
+/* Landing motion: the hero arrives in sequence, later sections and cards rise in as they scroll into
+   view (scroll-driven where the browser has it, otherwise they are simply there). */
+@keyframes enter {
+  from { opacity: 0; transform: translateY(14px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stagger > * { animation: enter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .stagger > :nth-child(2) { animation-delay: 60ms; }
+  .stagger > :nth-child(3) { animation-delay: 120ms; }
+  .stagger > :nth-child(4) { animation-delay: 180ms; }
+  .stagger > :nth-child(5) { animation-delay: 240ms; }
+  .stagger > :nth-child(n + 6) { animation-delay: 280ms; }
+  @supports (animation-timeline: view()) {
+    .reveal, .reveal-children > * {
+      animation: enter linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+      animation-delay: 0s;
+    }
+  }
+}

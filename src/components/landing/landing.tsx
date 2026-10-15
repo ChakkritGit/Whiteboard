@@ -86,7 +86,7 @@ export function Landing({ lang }: { lang: Lang }) {
         </header>
 
         <main className="mx-auto max-w-5xl px-6 pb-24">
-          <section className="pt-10 pb-16 sm:pt-16">
+          <section className="stagger pt-10 pb-16 sm:pt-16">
             <h1 className="font-hand max-w-3xl text-4xl leading-[1.15] font-extrabold tracking-tight text-balance sm:text-6xl">
               {t.tagline}
             </h1>
@@ -97,11 +97,11 @@ export function Landing({ lang }: { lang: Lang }) {
             </div>
           </section>
 
-          <section aria-labelledby="features" className="border-t border-line pt-14">
+          <section aria-labelledby="features" className="reveal border-t border-line pt-14">
             <h2 id="features" className="text-2xl font-bold tracking-tight sm:text-3xl">
               {t.whatItDoes}
             </h2>
-            <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="stagger reveal-children mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {t.features.map((feature, i) => (
                 <li key={feature.title} className="glass rounded-2xl p-5">
                   <span className="grid size-10 place-items-center rounded-xl bg-accent/12 text-accent-ink">
@@ -116,11 +116,11 @@ export function Landing({ lang }: { lang: Lang }) {
             </ul>
           </section>
 
-          <section aria-labelledby="how" className="mt-16 border-t border-line pt-14">
+          <section aria-labelledby="how" className="reveal mt-16 border-t border-line pt-14">
             <h2 id="how" className="text-2xl font-bold tracking-tight sm:text-3xl">
               {t.howItWorks}
             </h2>
-            <ol className="mt-8 grid gap-6 sm:grid-cols-3">
+            <ol className="stagger reveal-children mt-8 grid gap-6 sm:grid-cols-3">
               {t.steps.map(([title, body], i) => (
                 <li key={title}>
                   <span className="grid size-8 place-items-center rounded-full bg-ink text-sm font-bold text-canvas">
@@ -133,7 +133,7 @@ export function Landing({ lang }: { lang: Lang }) {
             </ol>
           </section>
 
-          <section aria-labelledby="faq" className="mt-16 border-t border-line pt-14">
+          <section aria-labelledby="faq" className="reveal mt-16 border-t border-line pt-14">
             <h2 id="faq" className="text-2xl font-bold tracking-tight sm:text-3xl">
               {t.questions}
             </h2>
