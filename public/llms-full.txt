@@ -1,0 +1,43 @@
+# Whiteboard
+
+> A free online whiteboard with nothing to sign up for. Open a board, send the link, and whoever opens it is in the room with you: draw, write and move notes together in real time.
+
+Whiteboard is a collaborative canvas at whiteboard.chakkritton.com. There are no accounts: the link is the access. Boards sync live between everyone in the room and are also kept in the browser, so they open offline.
+
+## Features
+
+- Real-time collaboration on a shared link, with live cursors and names
+- Sticky notes, text, frames, shapes (rectangle, ellipse, diamond), lines and arrows that stay attached to what they connect
+- A smooth pressure-sensitive pen (Apple Pencil works), a highlighter and an eraser
+- Pictures by drop, paste or picker
+- Planning and software templates: kanban, timeline, retro, mind map, flowchart, architecture, story map, sprint board
+- Mr. Worldwide, an AI guide that drafts a plan or flowchart onto the board, summarises it, tidies loose notes into groups, and answers questions about chakkritton.com
+- Export as PNG, JPEG, PDF or a JSON file you can import again
+- Thai and English, light and dark themes
+
+## Pages
+
+- [Home (Thai)](https://whiteboard.chakkritton.com): start a new board
+- [Home (English)](https://whiteboard.chakkritton.com/en)
+
+## Related
+
+- [Author: Chakkrit Laolit](https://chakkritton.com)
+- [System status](https://status.chakkritton.com)
+
+## How it works
+
+- The room is the URL. There are no accounts, sessions or a database of boards: whoever has the link is in the room.
+- The board is a CRDT (Yjs). Two people editing the same note write to different keys, so both edits survive.
+- IndexedDB keeps the board in your browser, so it opens instantly and works offline. A websocket relays it to everyone else in the room; the server holds a room in memory only while somebody is in it. What outlives everyone leaving is the copy in each browser and any file you exported.
+- Notes are real text (DOM elements), so what is written on them is selectable, editable in place and readable by screen readers.
+- Export writes plain JSON (contents, not history); import validates every field.
+
+## Keyboard shortcuts
+
+- V P H E R N T F: select, pen, highlighter, eraser, rectangle, note, text, frame
+- Drag on the empty board: sweep a selection · hold Space and drag: move the view · Cmd/Ctrl + wheel: zoom
+- Alt + drag a note: pull a copy out of it · right-click: cut, copy, order, lock, group
+- Double-click a note: edit it · Cmd/Ctrl + C X V D: copy, cut, paste, duplicate
+- Cmd/Ctrl + G: group (with Shift: ungroup) · ] and [: bring to front, send to back
+- Delete: remove the selection · Cmd/Ctrl + A: select all · Cmd/Ctrl + Z: undo (with Shift: redo)

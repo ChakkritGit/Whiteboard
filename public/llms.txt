@@ -24,3 +24,7 @@ Whiteboard is a collaborative canvas at whiteboard.chakkritton.com. There are no
 
 - [Author: Chakkrit Laolit](https://chakkritton.com)
 - [System status](https://status.chakkritton.com)
+
+## Optional
+
+- [Full text for language models](https://whiteboard.chakkritton.com/llms-full.txt)
