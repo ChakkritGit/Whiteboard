@@ -86,3 +86,9 @@ select it again.
 | `Delete` | remove what is selected |
 | `⌘`/`Ctrl` + `A` | select everything |
 | `⌘`/`Ctrl` + `Z` | undo · add `⇧` to redo |
+
+## VPS runtime
+
+The Next.js standalone server runs on Bun 1.4.2, with an Elysia 1.4.30 liveness route at
+`/api/healthz`. The existing Bun + Elysia Yjs relay remains the collaboration backend.
+Liveness does not create rooms, open WebSockets or read browser boards.
